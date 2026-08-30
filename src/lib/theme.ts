@@ -31,10 +31,10 @@ const slate = {
   // The page, and the two ends of the light falling across it. `page` is the
   // majority colour — the gradient only leans a little either side of it.
   page: '#1d2025',
-  pageLight: '#262930',
-  pageDark: '#171a1e',
-  surfaceLight: '#272b31',
-  surfaceDark: '#171a1f',
+  pageLight: '#23272e',
+  pageDark: '#191c21',
+  surfaceLight: '#22252b',
+  surfaceDark: '#1b1e23',
   border: '#33373f',
   borderStrong: '#767b85',
   muted: '#9aa0aa',
@@ -109,6 +109,12 @@ export const colors: Colors = {
  * from the same direction. Lighting a scene from two places is the fastest way
  * to make a soft-UI layout look like a collage.
  *
+ * Kept deliberately narrow — a few shades either side of the base, not a wash
+ * from light to dark. A strong gradient on a small surface reads as a shaded
+ * rectangle rather than as light falling across it, and a page full of them
+ * looks like tiles. The shadows do the work of separating surfaces; these only
+ * stop them looking flat.
+ *
  * `experimental_backgroundImage` is React Native's own CSS-gradient support —
  * no dependency and no native build. The prefix is the API's, not a comment on
  * how settled it is; the alternative is a native module for four colour stops.
@@ -118,7 +124,14 @@ export const gradients: Record<'page' | 'surface' | 'accent', BackgroundImageVal
     {
       type: 'linear-gradient',
       direction: 'to bottom left',
-      colorStops: [{ color: slate.pageLight }, { color: slate.pageDark }],
+      // Three stops rather than two: an eight-bit ramp across a whole screen
+      // bands into visible stripes, and a midpoint shortens each run enough to
+      // hide it.
+      colorStops: [
+        { color: slate.pageLight },
+        { color: slate.page },
+        { color: slate.pageDark },
+      ],
     },
   ],
   surface: [

@@ -3,6 +3,7 @@ import type { Habit } from './db/habits';
 import {
   archivedOn,
   countStatus,
+  isActiveOn,
   effectiveTarget,
   expectedByNow,
   periodOf,
@@ -248,6 +249,85 @@ export function letterFor(pct: number): string {
   if (pct >= 70) return 'C';
   if (pct >= 60) return 'D';
   return 'F';
+}
+
+export interface DayRate {
+  readonly day: DayKey;
+  /** 0–100, or null on a day nothing was scheduled. */
+  readonly pct: number | null;
+}
+
+/**
+ * The share of each day that was completed, across every habit.
+ *
+ * A day with nothing scheduled is null rather than zero — a rest day is not a
+ * failure, and plotting it as one would drag every weekend to the floor.
+ * Skipped habits leave the denominator, exactly as they do everywhere else.
+ */
+export function dailyRates(
+  habits: readonly Habit[],
+  completions: CompletionIndex,
+  range: DayRange,
+  today: DayKey
+): DayRate[] {
+  const rates: DayRate[] = [];
+
+  for (let day = range.from; day <= range.to && day <= today; day = addDays(day, 1)) {
+    let done = 0;
+    let scheduled = 0;
+
+    for (const habit of habits) {
+      if (!isActiveOn(habit, day)) continue;
+      const days = completions.get(habit.id);
+      const status = days?.get(day);
+      if (status === 'skipped') continue;
+
+      if (habit.scheduleKind === 'daily') {
+        if (!maskIncludes(habit.weekdayMask, day)) continue;
+        scheduled += 1;
+        if (status === 'done') done += 1;
+      } else if (status === 'done') {
+        // A flexible habit has no particular day it is owed on, so it only
+        // counts on the days it was actually done. Counting it as outstanding
+        // every day would punish a 3x-a-week habit on the four days off.
+        scheduled += 1;
+        done += 1;
+      }
+    }
+
+    rates.push({ day, pct: scheduled === 0 ? null : Math.round((done / scheduled) * 100) });
+  }
+
+  return rates;
+}
+
+/**
+ * A trailing average over `window` days, which is what turns a spiky daily
+ * series into a trend you can read.
+ *
+ * Days with nothing scheduled are skipped rather than counted as zero, so a
+ * quiet weekend does not pull the line down. A window containing no scheduled
+ * days at all carries the previous value forward — the line goes flat instead
+ * of breaking, which is the honest shape for "nothing happened here".
+ */
+export function rollingAverage(rates: readonly DayRate[], window: number): number[] {
+  const out: number[] = [];
+  let last = 0;
+
+  rates.forEach((_rate, index) => {
+    const from = Math.max(0, index - window + 1);
+    const slice = rates.slice(from, index + 1).filter((entry) => entry.pct !== null);
+
+    if (slice.length === 0) {
+      out.push(last);
+      return;
+    }
+    const mean = slice.reduce((total, entry) => total + (entry.pct ?? 0), 0) / slice.length;
+    last = Math.round(mean);
+    out.push(last);
+  });
+
+  return out;
 }
 
 /** Habits below their own target, worst first — the "needs improvement" list. */

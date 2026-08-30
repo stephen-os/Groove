@@ -2,15 +2,23 @@ import { useCallback, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { Card } from '@/components/ui/Card';
+import { LineChart } from '@/components/ui/LineChart';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
-import { addDays, todayKey } from '@/lib/date';
+import { addDays, fromDayKey, todayKey } from '@/lib/date';
 import { completionsForProfile, type Completion } from '@/lib/db/completions';
 import { listHabitsWithArchived, type Habit } from '@/lib/db/habits';
 import { getActiveProfileId } from '@/lib/db/profiles';
 import { describeSchedule, indexCompletions, monthRange, weekRange } from '@/lib/schedule';
-import { hadOpportunities, needsImprovement, overallGrade, statsFor } from '@/lib/stats';
-import { colors, MIN_TOUCH_TARGET, radius, spacing } from '@/lib/theme';
+import {
+  dailyRates,
+  hadOpportunities,
+  needsImprovement,
+  overallGrade,
+  rollingAverage,
+  statsFor,
+} from '@/lib/stats';
+import { colors, depth, gradients, MIN_TOUCH_TARGET, radius, spacing } from '@/lib/theme';
 
 type PeriodKey = 'week' | 'month' | 'quarter';
 
@@ -61,6 +69,19 @@ export default function AnalyticsScreen() {
   }, [habits, completions, range, today]);
 
   const grade = useMemo(() => overallGrade(stats), [stats]);
+
+  // A seven-day trailing average: the daily series is spiky enough to be
+  // unreadable, and the question the chart answers is which way things are
+  // going, not what happened last Tuesday.
+  const trend = useMemo(() => {
+    const rates = dailyRates(habits, indexCompletions(completions), range, today);
+    return {
+      values: rollingAverage(rates, 7),
+      labels: rates.map((rate) =>
+        fromDayKey(rate.day).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })
+      ),
+    };
+  }, [habits, completions, range, today]);
   const improve = useMemo(() => needsImprovement(stats), [stats]);
 
   return (
@@ -86,21 +107,32 @@ export default function AnalyticsScreen() {
         </View>
 
         <Card>
-          <Text variant="caption" tone="muted">
-            GRADE
-          </Text>
           <View style={styles.gradeRow}>
-            <Text variant="title" style={styles.gradeLetter}>
-              {grade.letter}
-            </Text>
-            <Text variant="title" style={styles.gradePct}>
-              {grade.pct}%
-            </Text>
+            <View style={styles.gradeLabels}>
+              <Text variant="caption" tone="muted">
+                GRADE
+              </Text>
+              <Text style={styles.gradePct}>{grade.pct}%</Text>
+              <Text variant="caption" tone="muted">
+                {stats.length === 0
+                  ? 'Nothing scheduled'
+                  : `across ${stats.length} habit${stats.length === 1 ? '' : 's'}`}
+              </Text>
+            </View>
+            <View style={styles.gradeBadge}>
+              <Text style={styles.gradeLetter}>{grade.letter}</Text>
+            </View>
+          </View>
+
+          <View style={styles.chart}>
+            <LineChart
+              values={trend.values}
+              labels={trend.labels}
+              accessibilityLabel={`Completion trend: ${grade.pct} percent, seven-day average`}
+            />
           </View>
           <Text variant="caption" tone="muted">
-            {stats.length === 0
-              ? 'Nothing was scheduled in this period.'
-              : `Averaged across ${stats.length} habit${stats.length === 1 ? '' : 's'}.`}
+            Seven-day average of everything scheduled.
           </Text>
         </Card>
 
@@ -190,9 +222,21 @@ const styles = StyleSheet.create({
   chipTextOn: { color: colors.onAccent },
   chipTextOff: { color: colors.fg },
   section: { marginTop: spacing.md, letterSpacing: 1 },
-  gradeRow: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.md },
-  gradeLetter: { color: colors.accent },
-  gradePct: { fontVariant: ['tabular-nums'] },
+  gradeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  gradeLabels: { gap: 2 },
+  gradePct: { fontSize: 40, fontWeight: '700', color: colors.fg, fontVariant: ['tabular-nums'] },
+  gradeBadge: {
+    width: 64,
+    height: 64,
+    borderRadius: radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.accent,
+    experimental_backgroundImage: gradients.accent,
+    boxShadow: depth.raisedSoft,
+  },
+  gradeLetter: { fontSize: 30, fontWeight: '700', color: colors.onAccent },
+  chart: { marginTop: spacing.md },
   habitRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   habitLabels: { flex: 1, gap: spacing.xs },
   habitPct: { fontVariant: ['tabular-nums'] },
