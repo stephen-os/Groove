@@ -1,7 +1,16 @@
 import { StyleSheet, View } from 'react-native';
 import Svg, { Circle, Defs, LinearGradient, Path, Stop, Line as SvgLine } from 'react-native-svg';
 import { Text } from '@/components/ui/Text';
-import { areaPath, labelIndices, plot, smoothPath, yFor, Y_TICKS, type PlotBox } from '@/lib/chart';
+import {
+  areaPath,
+  labelIndices,
+  niceDomain,
+  plot,
+  smoothPath,
+  ticksFor,
+  yFor,
+  type PlotBox,
+} from '@/lib/chart';
 import { colors, spacing } from '@/lib/theme';
 
 // A percentage over time, drawn the way a chart of anything else would be:
@@ -39,10 +48,14 @@ export function LineChart({
     padBottom: 22,
   };
 
-  const points = plot(values, box);
-  const baseline = yFor(0, box);
+  // Fitted to the data rather than pinned to 0–100: a rate that lives between
+  // 70 and 95 has nothing to say when three quarters of the chart is empty.
+  const domain = niceDomain(values);
+  const ticks = ticksFor(domain);
+  const points = plot(values, box, domain);
+  const baseline = yFor(domain.min, box, domain);
   const last = points[points.length - 1];
-  const ticks = labelIndices(labels.length, 4);
+  const labelAt = labelIndices(labels.length, 4);
 
   if (points.length === 0) {
     return (
@@ -62,13 +75,13 @@ export function LineChart({
           </LinearGradient>
         </Defs>
 
-        {Y_TICKS.map((tick) => (
+        {ticks.map((tick) => (
           <SvgLine
             key={tick}
             x1={box.padLeft}
             x2={box.width - box.padRight}
-            y1={yFor(tick, box)}
-            y2={yFor(tick, box)}
+            y1={yFor(tick, box, domain)}
+            y2={yFor(tick, box, domain)}
             stroke={colors.border}
             strokeWidth={0.5}
           />
@@ -93,7 +106,7 @@ export function LineChart({
           app's font and honour the system font-size setting, which SVG text
           does not. */}
       <View style={styles.yAxis} pointerEvents="none">
-        {[...Y_TICKS].reverse().map((tick) => (
+        {[...ticks].reverse().map((tick) => (
           <Text key={tick} variant="caption" tone="muted" style={styles.yLabel}>
             {tick}%
           </Text>
@@ -101,7 +114,7 @@ export function LineChart({
       </View>
 
       <View style={styles.xAxis}>
-        {ticks.map((index) => (
+        {labelAt.map((index) => (
           <Text key={index} variant="caption" tone="muted">
             {labels[index]}
           </Text>

@@ -57,10 +57,18 @@ const TEMPLATES: readonly Template[] = [
  * Seeded from the two things that identify the slot, so the same day always
  * gets the same answer — a reseed produces an identical history rather than a
  * new one, which is what makes before-and-after screenshots comparable.
+ *
+ * mulberry32 over a mixed seed, rather than the fractional part of a scaled
+ * sine — the same idea, but with a distribution that holds up across the range
+ * rather than clumping.
  */
 function jitter(index: number, offset: number): number {
-  const hash = Math.sin(index * 127.1 + offset * 311.7) * 43758.5453;
-  return hash - Math.floor(hash);
+  let seed = (index * 0x9e3779b1 + offset * 0x85ebca6b) >>> 0;
+  seed = (seed + 0x6d2b79f5) >>> 0;
+  let t = seed;
+  t = Math.imul(t ^ (t >>> 15), t | 1);
+  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
 }
 
 /**
@@ -111,6 +119,10 @@ export async function seedDemoData(): Promise<{ habits: number; completions: num
       for (let offset = 0; offset < DAYS; offset += 1) {
         const day = addDays(start, offset);
 
+        // Today is left untouched, so the Today screen opens with something to
+        // actually tick rather than a list that is already finished.
+        if (day >= today) continue;
+
         // Only tick days the habit was actually due, or the history would
         // disagree with the schedule engine the moment a screen reads it.
         if (template.scheduleKind === 'daily' && !maskIncludes(template.weekdayMask, day)) {
@@ -120,15 +132,22 @@ export async function seedDemoData(): Promise<{ habits: number; completions: num
         if (template.scheduleKind !== 'daily' && offset % 3 !== 0) continue;
 
         const roll = jitter(index, offset);
-        // A tenth of the misses become deliberate skips, so the skip paths and
-        // the "opted out" wording have something to show.
+        // A fifth of whatever miss probability is left becomes a deliberate
+        // skip, so the skip paths have something to show.
+        //
+        // A fifth *of the remainder*, not a fixed slice: a flat `rate + 0.06`
+        // reaches past 1.0 once the rate is above 0.94, which turned every miss
+        // for a 96% habit into a skip. Skips leave the denominator, so the
+        // habit came out at a flawless 86 of 86 with an unbroken streak — demo
+        // data that could not show a miss at all.
+        const skipBelow = template.rate + (1 - template.rate) * 0.2;
         if (roll < template.rate) {
           await db.runAsync(
             'INSERT INTO completions (habit_id, day, status, done_at) VALUES (?, ?, ?, ?)',
             [habitId, day, 'done', now]
           );
           completions += 1;
-        } else if (roll < template.rate + 0.06) {
+        } else if (roll < skipBelow) {
           await db.runAsync(
             'INSERT INTO completions (habit_id, day, status, done_at) VALUES (?, ?, ?, ?)',
             [habitId, day, 'skipped', now]

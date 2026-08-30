@@ -27,8 +27,57 @@ export interface PlotBox {
  */
 const round = (value: number): number => Math.round(value * 100) / 100;
 
-/** The percentage marks the horizontal grid lines are drawn at. */
-export const Y_TICKS: readonly number[] = [0, 25, 50, 75, 100];
+export interface Domain {
+  readonly min: number;
+  readonly max: number;
+}
+
+/** The widest a domain can be, since these are percentages. */
+const FULL: Domain = { min: 0, max: 100 };
+
+/**
+ * A rounded vertical range that fits the data.
+ *
+ * A habit tracker's rate rarely visits the bottom half, so pinning the axis to
+ * 0–100 leaves the line pressed against the ceiling with three quarters of the
+ * chart empty and every movement flattened out of readability.
+ *
+ * The bounds are snapped outwards to multiples of ten, so the labels are round
+ * numbers rather than whatever the data happened to touch, and the range is
+ * held to `minSpan` so a steady week does not get magnified into a mountain
+ * range by a two-point wobble.
+ */
+export function niceDomain(values: readonly number[], minSpan = 30): Domain {
+  if (values.length === 0) return FULL;
+
+  const lo = Math.min(...values);
+  const hi = Math.max(...values);
+
+  let min = Math.max(0, Math.floor((lo - 5) / 10) * 10);
+  let max = Math.min(100, Math.ceil((hi + 5) / 10) * 10);
+
+  // Grow the shorter side first so the data keeps its place in the frame, then
+  // the other, so a series near a limit is not pushed off-centre by padding
+  // that had nowhere to go.
+  while (max - min < minSpan && (min > 0 || max < 100)) {
+    if (max < 100) max = Math.min(100, max + 10);
+    else if (min > 0) min = Math.max(0, min - 10);
+  }
+
+  return { min, max };
+}
+
+/** Evenly spaced, whole-number marks across a domain, for the grid lines. */
+export function ticksFor(domain: Domain, count = 5): number[] {
+  const steps = Math.max(count - 1, 1);
+  const span = domain.max - domain.min;
+  const marks = Array.from({ length: count }, (_, index) =>
+    Math.round(domain.min + (span * index) / steps)
+  );
+  // A narrow domain can round two marks onto the same number; a duplicated
+  // grid line is worse than one fewer.
+  return [...new Set(marks)];
+}
 
 /**
  * Maps a series of 0–100 values onto the box, in SVG coordinates.
@@ -39,25 +88,26 @@ export const Y_TICKS: readonly number[] = [0, 25, 50, 75, 100];
  *
  * A single value is placed at the left edge rather than divided by zero.
  */
-export function plot(values: readonly number[], box: PlotBox): Point[] {
+export function plot(
+  values: readonly number[],
+  box: PlotBox,
+  domain: Domain = FULL
+): Point[] {
   const innerWidth = box.width - box.padLeft - box.padRight;
-  const innerHeight = box.height - box.padTop - box.padBottom;
   const steps = Math.max(values.length - 1, 1);
 
-  return values.map((value, index) => {
-    const clamped = Math.min(Math.max(value, 0), 100);
-    return {
-      x: round(box.padLeft + (innerWidth * index) / steps),
-      y: round(box.padTop + innerHeight * (1 - clamped / 100)),
-    };
-  });
+  return values.map((value, index) => ({
+    x: round(box.padLeft + (innerWidth * index) / steps),
+    y: yFor(value, box, domain),
+  }));
 }
 
 /** The y coordinate a given percentage sits at — for grid lines and labels. */
-export function yFor(percent: number, box: PlotBox): number {
+export function yFor(percent: number, box: PlotBox, domain: Domain = FULL): number {
   const innerHeight = box.height - box.padTop - box.padBottom;
-  const clamped = Math.min(Math.max(percent, 0), 100);
-  return round(box.padTop + innerHeight * (1 - clamped / 100));
+  const span = domain.max - domain.min || 1;
+  const clamped = Math.min(Math.max(percent, domain.min), domain.max);
+  return round(box.padTop + innerHeight * (1 - (clamped - domain.min) / span));
 }
 
 /**

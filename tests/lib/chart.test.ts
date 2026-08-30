@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { areaPath, labelIndices, plot, smoothPath, yFor, type PlotBox } from '@/lib/chart';
+import {
+  areaPath,
+  labelIndices,
+  niceDomain,
+  plot,
+  smoothPath,
+  ticksFor,
+  yFor,
+  type PlotBox,
+} from '@/lib/chart';
 
 const box: PlotBox = {
   width: 300,
@@ -118,5 +127,78 @@ describe('labelIndices', () => {
 
   it('is empty for an empty series', () => {
     expect(labelIndices(0, 4)).toEqual([]);
+  });
+});
+
+
+describe('niceDomain', () => {
+  it('fits a band of data instead of spanning the whole range', () => {
+    const domain = niceDomain([72, 88, 79, 91]);
+    expect(domain.max).toBeLessThanOrEqual(100);
+    expect(domain.min).toBeGreaterThan(0);
+    expect(domain.max - domain.min).toBeLessThan(100);
+  });
+
+  it('snaps its bounds outwards to round numbers', () => {
+    const domain = niceDomain([72, 91]);
+    expect(domain.min % 10).toBe(0);
+    expect(domain.max % 10).toBe(0);
+    expect(domain.min).toBeLessThanOrEqual(72);
+    expect(domain.max).toBeGreaterThanOrEqual(91);
+  });
+
+  it('never leaves the percentage range', () => {
+    expect(niceDomain([0, 3]).min).toBe(0);
+    expect(niceDomain([98, 100]).max).toBe(100);
+  });
+
+  it('keeps a minimum span, so a steady run is not magnified into drama', () => {
+    const domain = niceDomain([80, 81, 80, 82]);
+    expect(domain.max - domain.min).toBeGreaterThanOrEqual(30);
+  });
+
+  it('spans everything when there is no data', () => {
+    expect(niceDomain([])).toEqual({ min: 0, max: 100 });
+  });
+
+  it('handles a perfectly flat series', () => {
+    const domain = niceDomain([100, 100, 100]);
+    expect(domain.max).toBe(100);
+    expect(domain.max - domain.min).toBeGreaterThanOrEqual(30);
+  });
+});
+
+describe('ticksFor', () => {
+  it('spans the domain end to end', () => {
+    const ticks = ticksFor({ min: 40, max: 100 });
+    expect(ticks[0]).toBe(40);
+    expect(ticks[ticks.length - 1]).toBe(100);
+  });
+
+  it('returns whole numbers', () => {
+    for (const tick of ticksFor({ min: 30, max: 100 })) {
+      expect(Number.isInteger(tick)).toBe(true);
+    }
+  });
+
+  it('never repeats a grid line', () => {
+    const ticks = ticksFor({ min: 99, max: 100 });
+    expect(new Set(ticks).size).toBe(ticks.length);
+  });
+});
+
+describe('plot with a domain', () => {
+  const tall: PlotBox = { width: 100, height: 100, padLeft: 0, padRight: 0, padTop: 0, padBottom: 0 };
+
+  it('uses the whole height for the fitted range', () => {
+    const domain = { min: 60, max: 100 };
+    const [low, high] = plot([60, 100], tall, domain);
+    expect(low.y).toBe(100);
+    expect(high.y).toBe(0);
+  });
+
+  it('clamps to the domain rather than drawing outside the box', () => {
+    const domain = { min: 60, max: 100 };
+    expect(plot([10], tall, domain)[0].y).toBe(100);
   });
 });
