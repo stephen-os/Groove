@@ -37,6 +37,26 @@ export function fromDayKey(key: DayKey): Date {
   return new Date(year, month - 1, day);
 }
 
+/** The day `count` days after `key` (negative counts go backwards). */
+export function addDays(key: DayKey, count: number): DayKey {
+  const date = fromDayKey(key);
+  // setDate rolls over month and year ends by itself, including leap days.
+  date.setDate(date.getDate() + count);
+  return toDayKey(date);
+}
+
+/**
+ * A local `Date` for a wall-clock time on a given day.
+ *
+ * Built from components for the same reason as `fromDayKey`: 7am means 7am
+ * where the phone is, not 7am UTC.
+ */
+export function atTimeOn(key: DayKey, time: string): Date {
+  const [year, month, day] = key.split('-').map(Number);
+  const [hours, minutes] = time.split(':').map(Number);
+  return new Date(year, month - 1, day, hours, minutes, 0, 0);
+}
+
 /** Day of the week for a day key, numbered as `Date.getDay()`: 0 is Sunday. */
 export function weekdayOf(key: DayKey): number {
   return fromDayKey(key).getDay();

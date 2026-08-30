@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { StyleSheet, Text as RNText, View } from 'react-native';
+import { AppState, StyleSheet, Text as RNText, View } from 'react-native';
+import * as Notifications from 'expo-notifications';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
@@ -7,6 +8,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { getDatabase } from '@/lib/db/client';
 import { configureNotifications } from '@/lib/notifications';
+import { handleReminderResponse, syncReminders } from '@/lib/reminders';
 import { colors, fontSize, spacing } from '@/lib/theme';
 
 // Hold the splash screen until the database is open and built, so the first
@@ -41,6 +43,31 @@ export default function RootLayout() {
     };
     void prepare();
   }, []);
+
+  // Reminders live on a rolling horizon that only extends a week out, so it has
+  // to be refilled regularly. Every return to the foreground is the natural
+  // moment: it is frequent enough to keep the horizon from running dry, and it
+  // costs nothing when there is nothing to change.
+  useEffect(() => {
+    if (startup.status !== 'ready') return;
+
+    void syncReminders();
+
+    const appState = AppState.addEventListener('change', (next) => {
+      if (next === 'active') void syncReminders();
+    });
+
+    // Fires when a reminder's Done or Snooze button is tapped, including while
+    // the app is in the background.
+    const responses = Notifications.addNotificationResponseReceivedListener((response) => {
+      void handleReminderResponse(response);
+    });
+
+    return () => {
+      appState.remove();
+      responses.remove();
+    };
+  }, [startup.status]);
 
   if (startup.status === 'loading') return null;
 

@@ -15,6 +15,7 @@ import {
   type Habit,
 } from '@/lib/db/habits';
 import { getActiveProfileId } from '@/lib/db/profiles';
+import { syncReminders } from '@/lib/reminders';
 import { describeSchedule } from '@/lib/schedule';
 import { colors, MIN_TOUCH_TARGET, spacing } from '@/lib/theme';
 
@@ -42,6 +43,9 @@ export default function ManageHabitsScreen() {
   const run = useCallback(
     (action: Promise<void>, failure: string): void => {
       action
+        // Archiving, restoring and deleting all change what is due, and so
+        // what should still be pending with the OS.
+        .then(syncReminders)
         .then(load)
         .catch((error: unknown) => {
           console.error(failure, error);

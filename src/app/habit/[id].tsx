@@ -4,6 +4,7 @@ import { HabitForm } from '@/components/pages/habit/HabitForm';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { getHabit, updateHabit, type Habit, type HabitInput } from '@/lib/db/habits';
+import { syncReminders } from '@/lib/reminders';
 
 export default function EditHabitScreen() {
   const router = useRouter();
@@ -39,6 +40,9 @@ export default function EditHabitScreen() {
 
   const save = async (input: HabitInput): Promise<void> => {
     await updateHabit(habitId, input);
+    // The schedule or the due time may have moved, so every alert already
+    // placed for this habit is potentially wrong.
+    await syncReminders();
     router.back();
   };
 

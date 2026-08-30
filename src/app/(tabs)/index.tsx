@@ -10,6 +10,7 @@ import { fromDayKey, todayKey } from '@/lib/date';
 import { completionsBetween, setDone, type Completion } from '@/lib/db/completions';
 import { listHabits, type Habit } from '@/lib/db/habits';
 import { getActiveProfileId } from '@/lib/db/profiles';
+import { cancelDayChain, syncReminders } from '@/lib/reminders';
 import {
   describeSchedule,
   habitsDueOn,
@@ -119,6 +120,12 @@ export default function TodayScreen() {
           ? [...current, { id: -Date.now(), habitId: habit.id, day, doneAt: Date.now() }]
           : current.filter((entry) => !(entry.habitId === habit.id && entry.day === day))
       );
+
+      // Ticking silences the rest of today's chain immediately — that is the
+      // whole point of it. Un-ticking has to put the chain back, which needs a
+      // full replan, so it takes the slower path.
+      if (next) void cancelDayChain(habit.id, day);
+      else void syncReminders();
 
       setDone(habit.id, day, next).catch((error: unknown) => {
         console.error('Could not save that tick:', error);
