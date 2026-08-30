@@ -29,7 +29,7 @@ export default function SettingsScreen() {
   const confirmImport = (): void => {
     Alert.alert(
       'Restore from backup?',
-      'This replaces every item currently in the app with the contents of the backup file. It cannot be undone.',
+      'This replaces every profile, habit and completed day in the app with the contents of the backup file. It cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Replace', style: 'destructive', onPress: () => run(importBackup) },
@@ -60,14 +60,14 @@ export default function SettingsScreen() {
               label="Export backup"
               onPress={() => run(exportBackup)}
               disabled={busy}
-              accessibilityHint="Writes all items to a JSON file and opens the share sheet"
+              accessibilityHint="Writes every habit and completed day to a JSON file and opens the share sheet"
             />
             <Button
               label="Restore from backup"
               tone="secondary"
               onPress={confirmImport}
               disabled={busy}
-              accessibilityHint="Replaces all items with the contents of a backup file"
+              accessibilityHint="Replaces all data with the contents of a backup file"
             />
           </View>
 

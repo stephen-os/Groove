@@ -22,10 +22,10 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Items',
+          title: 'Today',
           // The icon is decorative — the tab's accessible name comes from its
           // title, and the active tab is announced as selected by the tab role.
-          tabBarIcon: ({ color, size }) => <Ionicons name="list" size={size} color={color} />,
+          tabBarIcon: ({ color, size }) => <Ionicons name="today" size={size} color={color} />,
         }}
       />
       <Tabs.Screen

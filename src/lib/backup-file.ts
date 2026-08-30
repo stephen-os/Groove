@@ -1,31 +1,29 @@
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { backupFilename, parseBackup, serializeBackup } from './backup';
-import { listItems, replaceAllItems } from './db/items';
+import { exportData, replaceData } from './db/data';
 
 // The file-system half of backup. Kept apart from backup.ts so the parsing and
 // validation logic stays pure and testable; everything here is IO.
 
-export type BackupOutcome =
-  | { ok: true; message: string }
-  | { ok: false; message: string };
+export type BackupOutcome = { ok: true; message: string } | { ok: false; message: string };
 
 /**
- * Writes every item to a JSON file and opens the system share sheet.
+ * Writes the whole database to a JSON file and opens the system share sheet.
  *
  * The file goes to the cache directory on purpose: once it has been shared out
- * to Drive, email or wherever, the copy has served its purpose, and the OS is
+ * to Drive, email or a USB cable, the copy has served its purpose and the OS is
  * free to reclaim it. Writing backups into permanent storage would quietly grow
  * forever.
  */
 export async function exportBackup(): Promise<BackupOutcome> {
   try {
-    const items = await listItems();
+    const data = await exportData();
     const file = new File(Paths.cache, backupFilename());
 
     // `create` then `write` — write alone fails if the file does not exist.
     if (!file.exists) file.create();
-    file.write(serializeBackup(items));
+    file.write(serializeBackup(data));
 
     if (!(await Sharing.isAvailableAsync())) {
       return {
@@ -39,7 +37,10 @@ export async function exportBackup(): Promise<BackupOutcome> {
       dialogTitle: 'Save backup',
     });
 
-    return { ok: true, message: `Exported ${items.length} item(s).` };
+    return {
+      ok: true,
+      message: `Exported ${data.habits.length} habit(s) and ${data.completions.length} completed day(s).`,
+    };
   } catch (error) {
     console.error('Backup export failed:', error);
     return { ok: false, message: 'Could not create the backup file.' };
@@ -47,7 +48,7 @@ export async function exportBackup(): Promise<BackupOutcome> {
 }
 
 /**
- * Lets the user pick a backup file and replaces all items with its contents.
+ * Lets the user pick a backup file and replaces the whole database with it.
  *
  * 1. Pick a file. Cancelling is a normal outcome, not an error.
  * 2. Read and validate it — this is the untrusted boundary (see backup.ts).
@@ -66,8 +67,11 @@ export async function importBackup(): Promise<BackupOutcome> {
     const parsed = parseBackup(text);
     if (!parsed.ok) return { ok: false, message: parsed.error };
 
-    await replaceAllItems(parsed.backup.items);
-    return { ok: true, message: `Restored ${parsed.backup.items.length} item(s).` };
+    await replaceData(parsed.backup);
+    return {
+      ok: true,
+      message: `Restored ${parsed.backup.habits.length} habit(s) and ${parsed.backup.completions.length} completed day(s).`,
+    };
   } catch (error) {
     console.error('Backup import failed:', error);
     return { ok: false, message: 'Could not read that file.' };

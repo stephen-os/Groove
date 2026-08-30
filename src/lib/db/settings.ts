@@ -8,7 +8,7 @@ import { getDatabase } from './client';
 // persisted state in one file.
 
 /** Every settings key the app knows about. Adding one here is what makes it typed. */
-export type SettingKey = 'themePreference';
+export type SettingKey = 'themePreference' | 'activeProfileId';
 
 export async function getSetting(key: SettingKey): Promise<string | null> {
   const db = await getDatabase();

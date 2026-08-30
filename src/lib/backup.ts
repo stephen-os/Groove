@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { Item } from './db/items';
+import type { GrooveData } from './db/data';
 
 // Backup serialisation and parsing. Pure — no file system, no database — so the
 // validation logic is exhaustively testable in plain Node.
@@ -20,55 +20,119 @@ export const BACKUP_FORMAT_VERSION = 1;
 
 // Bounds on every field. An unbounded string or array from a file the app will
 // happily read into memory is how a 2GB "backup" becomes a crash on launch.
-const MAX_TITLE = 200;
-const MAX_BODY = 10_000;
-const MAX_ITEMS = 50_000;
+const MAX_NAME = 200;
+const MAX_PROFILES = 100;
+const MAX_HABITS = 2_000;
+// Ten years of thirty habits ticked every day, with room to spare.
+const MAX_COMPLETIONS = 200_000;
 
 // Epoch milliseconds. Non-negative and finite; `z.number()` alone would accept
 // NaN and Infinity, which SQLite would store as NULL or reject.
 const timestamp = z.number().int().nonnegative();
+const id = z.number().int().positive();
+const dayKey = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected a YYYY-MM-DD day.');
 
-const ItemSchema = z.strictObject({
-  id: z.number().int().positive(),
-  title: z.string().max(MAX_TITLE),
-  body: z.string().max(MAX_BODY),
+const ProfileSchema = z.strictObject({
+  id,
+  name: z.string().max(MAX_NAME),
+  createdAt: timestamp,
+});
+
+const HabitSchema = z.strictObject({
+  id,
+  profileId: id,
+  name: z.string().max(MAX_NAME),
+  icon: z.string().max(32),
+  color: z.string().max(32),
+  sortOrder: z.number().int(),
+  scheduleKind: z.enum(['daily', 'weekly', 'monthly']),
+  // Seven bits, so anything outside 0–127 is not a week.
+  weekdayMask: z.number().int().min(0).max(127),
+  targetCount: z.number().int().min(1).max(366),
+  dueTime: z
+    .string()
+    .regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Expected a HH:MM time.')
+    .nullable(),
+  remindEnabled: z.boolean(),
+  targetPct: z.number().int().min(0).max(100),
+  startsOn: dayKey,
+  archivedAt: timestamp.nullable(),
   createdAt: timestamp,
   updatedAt: timestamp,
-  remindAt: timestamp.nullable(),
-  notificationId: z.string().max(200).nullable(),
+});
+
+const CompletionSchema = z.strictObject({
+  id,
+  habitId: id,
+  day: dayKey,
+  doneAt: timestamp,
 });
 
 const BackupSchema = z.strictObject({
   formatVersion: z.literal(BACKUP_FORMAT_VERSION),
   exportedAt: timestamp,
-  items: z.array(ItemSchema).max(MAX_ITEMS),
+  profiles: z.array(ProfileSchema).max(MAX_PROFILES),
+  habits: z.array(HabitSchema).max(MAX_HABITS),
+  completions: z.array(CompletionSchema).max(MAX_COMPLETIONS),
 });
 
 type Backup = z.infer<typeof BackupSchema>;
 
-/** Serialises items into the backup file's exact on-disk shape. */
-export function serializeBackup(items: readonly Item[], now: number = Date.now()): string {
+/** Serialises the database into the backup file's exact on-disk shape. */
+export function serializeBackup(data: GrooveData, now: number = Date.now()): string {
   const backup: Backup = {
     formatVersion: BACKUP_FORMAT_VERSION,
     exportedAt: now,
-    items: items.map((item) => ({
-      id: item.id,
-      title: item.title,
-      body: item.body,
-      createdAt: item.createdAt,
-      updatedAt: item.updatedAt,
-      remindAt: item.remindAt,
-      notificationId: item.notificationId,
-    })),
+    profiles: data.profiles.map((profile) => ({ ...profile })),
+    habits: data.habits.map((habit) => ({ ...habit })),
+    completions: data.completions.map((completion) => ({ ...completion })),
   };
   // Indented: a backup you can open and read is a backup you can salvage by
   // hand when something has gone badly wrong.
   return JSON.stringify(backup, null, 2);
 }
 
-export type ParseResult =
-  | { ok: true; backup: Backup }
-  | { ok: false; error: string };
+/**
+ * Checks the file is internally consistent, beyond each row being well-formed.
+ *
+ * Zod validates rows in isolation; these are the rules that only exist between
+ * them, and they are exactly the ones the database enforces. Without this check
+ * a habit pointing at a missing profile would pass validation and then blow up
+ * mid-restore on a foreign key, which is far harder to explain to the person
+ * holding the phone than "that file isn't a valid backup".
+ */
+function referentialError(backup: Backup): string | null {
+  const profileIds = new Set(backup.profiles.map((profile) => profile.id));
+  const habitIds = new Set(backup.habits.map((habit) => habit.id));
+
+  if (profileIds.size !== backup.profiles.length) return 'That backup has duplicate profiles.';
+  if (habitIds.size !== backup.habits.length) return 'That backup has duplicate habits.';
+
+  const orphanHabit = backup.habits.find((habit) => !profileIds.has(habit.profileId));
+  if (orphanHabit) {
+    return `That backup has a habit ("${orphanHabit.name}") belonging to a profile it does not contain.`;
+  }
+
+  const orphanCompletion = backup.completions.find(
+    (completion) => !habitIds.has(completion.habitId)
+  );
+  if (orphanCompletion) {
+    return 'That backup records a completed day for a habit it does not contain.';
+  }
+
+  // Mirrors the unique index on (habit_id, day) — a duplicate would abort the
+  // restore transaction after most of the data had already been written.
+  const seen = new Set<string>();
+  for (const completion of backup.completions) {
+    const key = `${completion.habitId}:${completion.day}`;
+    if (seen.has(key)) return 'That backup marks the same habit complete twice on one day.';
+    seen.add(key);
+  }
+
+  return null;
+}
+
+export type ParseResult = { ok: true; backup: Backup } | { ok: false; error: string };
 
 /**
  * Parses and validates backup file contents.
@@ -76,9 +140,6 @@ export type ParseResult =
  * Returns a result rather than throwing: every failure here is a user-facing
  * "that file isn't a valid backup", not a programmer error, and the caller has
  * to show a message either way.
- *
- * The message is deliberately generic about *why* — the specific Zod issue is
- * useful to a developer but noise to a user staring at a settings screen.
  */
 export function parseBackup(text: string): ParseResult {
   const json: unknown = (() => {
@@ -99,8 +160,8 @@ export function parseBackup(text: string): ParseResult {
   if (!parsed.success) {
     // Distinguish the one failure a user can act on: a file from a version this
     // build doesn't understand. Everything else is "wrong file".
-    const wrongVersion = parsed.error.issues.some((issue) =>
-      issue.path.length === 1 && issue.path[0] === 'formatVersion'
+    const wrongVersion = parsed.error.issues.some(
+      (issue) => issue.path.length === 1 && issue.path[0] === 'formatVersion'
     );
     return {
       ok: false,
@@ -110,11 +171,14 @@ export function parseBackup(text: string): ParseResult {
     };
   }
 
+  const inconsistent = referentialError(parsed.data);
+  if (inconsistent !== null) return { ok: false, error: inconsistent };
+
   return { ok: true, backup: parsed.data };
 }
 
 /** Timestamped filename, safe on every filesystem — no colons, no spaces. */
 export function backupFilename(now: Date = new Date()): string {
   const stamp = now.toISOString().slice(0, 19).replace(/[:T]/g, '-');
-  return `backup-${stamp}.json`;
+  return `groove-${stamp}.json`;
 }

@@ -88,7 +88,7 @@ function AppStack() {
         }}
       >
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="item/new" options={{ presentation: 'modal', title: 'New item' }} />
+        <Stack.Screen name="habit/new" options={{ presentation: 'modal', title: 'New habit' }} />
         <Stack.Screen name="+not-found" options={{ title: 'Not found' }} />
       </Stack>
     </>
