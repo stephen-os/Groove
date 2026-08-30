@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useTheme } from '@/components/layout/ThemeProvider';
 import { Button } from '@/components/ui/Button';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
@@ -9,7 +8,7 @@ import { TextField } from '@/components/ui/TextField';
 import { EVERY_DAY, WEEKDAYS } from '@/lib/date';
 import { createHabit, type ScheduleKind } from '@/lib/db/habits';
 import { getActiveProfileId } from '@/lib/db/profiles';
-import { MIN_TOUCH_TARGET, radius, spacing } from '@/lib/theme';
+import { colors, MIN_TOUCH_TARGET, radius, spacing } from '@/lib/theme';
 
 // Keep in step with the bound in lib/backup.ts, or a habit can be saved that a
 // backup of itself would then reject as invalid.
@@ -23,24 +22,19 @@ const KINDS: readonly { readonly kind: ScheduleKind; readonly label: string }[] 
 
 const COUNTS: readonly number[] = [1, 2, 3, 4, 5, 6, 7];
 
+// Selection is carried by fill as well as by the `checked`/`selected` state the
+// role announces, so it never rests on colour alone.
+const chipStyle = (selected: boolean) => [styles.chip, selected ? styles.chipOn : styles.chipOff];
+const chipTextColor = (selected: boolean) => (selected ? styles.chipTextOn : styles.chipTextOff);
+
 export default function NewHabitScreen() {
   const router = useRouter();
-  const { theme } = useTheme();
   const [name, setName] = useState('');
   const [kind, setKind] = useState<ScheduleKind>('daily');
   const [weekdayMask, setWeekdayMask] = useState(EVERY_DAY);
   const [targetCount, setTargetCount] = useState(3);
   const [error, setError] = useState<string | undefined>(undefined);
   const [saving, setSaving] = useState(false);
-
-  const chipStyle = (selected: boolean) => [
-    styles.chip,
-    {
-      backgroundColor: selected ? theme.accent : 'transparent',
-      borderColor: selected ? theme.accent : theme.borderStrong,
-    },
-  ];
-  const chipTextColor = (selected: boolean) => ({ color: selected ? theme.onAccent : theme.fg });
 
   const save = (): void => {
     const trimmed = name.trim();
@@ -182,4 +176,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  chipOn: { backgroundColor: colors.accent, borderColor: colors.accent },
+  chipOff: { backgroundColor: 'transparent', borderColor: colors.borderStrong },
+  chipTextOn: { color: colors.onAccent },
+  chipTextOff: { color: colors.fg },
 });

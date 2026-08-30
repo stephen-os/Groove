@@ -1,7 +1,6 @@
 import { StyleSheet, View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useTheme } from '@/components/layout/ThemeProvider';
-import { spacing } from '@/lib/theme';
+import { colors, spacing } from '@/lib/theme';
 
 interface ScreenProps {
   children: React.ReactNode;
@@ -14,7 +13,7 @@ interface ScreenProps {
 }
 
 /**
- * The outer frame of every screen: themed background plus safe-area padding.
+ * The outer frame of every screen: background plus safe-area padding.
  *
  * Insets are applied as padding rather than using SafeAreaView so the background
  * colour still extends under the status bar and navigation gestures. Android
@@ -23,7 +22,6 @@ interface ScreenProps {
  * the clock.
  */
 export function Screen({ children, edgeToEdgeBottom = false, style }: ScreenProps) {
-  const { theme } = useTheme();
   const insets = useSafeAreaInsets();
 
   return (
@@ -31,7 +29,6 @@ export function Screen({ children, edgeToEdgeBottom = false, style }: ScreenProp
       style={[
         styles.root,
         {
-          backgroundColor: theme.bg,
           paddingTop: insets.top,
           paddingBottom: edgeToEdgeBottom ? 0 : insets.bottom,
           paddingLeft: insets.left,
@@ -48,6 +45,7 @@ export function Screen({ children, edgeToEdgeBottom = false, style }: ScreenProp
 const styles = StyleSheet.create({
   root: {
     flex: 1,
+    backgroundColor: colors.bg,
     paddingHorizontal: spacing.md,
   },
 });

@@ -1,8 +1,7 @@
 import { useId } from 'react';
 import { StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
-import { useTheme } from '@/components/layout/ThemeProvider';
 import { Text } from '@/components/ui/Text';
-import { MIN_TOUCH_TARGET, radius, spacing } from '@/lib/theme';
+import { colors, MIN_TOUCH_TARGET, radius, spacing } from '@/lib/theme';
 
 interface TextFieldProps extends Omit<TextInputProps, 'style'> {
   label: string;
@@ -22,7 +21,6 @@ interface TextFieldProps extends Omit<TextInputProps, 'style'> {
  * below that (see theme.ts).
  */
 export function TextField({ label, error, multiline, ...rest }: TextFieldProps) {
-  const { theme } = useTheme();
   const labelId = useId();
 
   return (
@@ -40,14 +38,10 @@ export function TextField({ label, error, multiline, ...rest }: TextFieldProps) 
         // the only signal, which is colour-alone.
         accessibilityHint={error}
         multiline={multiline}
-        placeholderTextColor={theme.muted}
+        placeholderTextColor={colors.muted}
         style={[
           styles.input,
-          {
-            backgroundColor: theme.bgAlt,
-            borderColor: error ? theme.error : theme.borderStrong,
-            color: theme.fg,
-          },
+          error !== undefined ? styles.inputError : null,
           multiline ? styles.multiline : null,
         ]}
         {...rest}
@@ -67,11 +61,17 @@ const styles = StyleSheet.create({
   },
   input: {
     minHeight: MIN_TOUCH_TARGET,
+    backgroundColor: colors.bgAlt,
+    borderColor: colors.borderStrong,
+    color: colors.fg,
     borderRadius: radius.sm,
     borderWidth: 1,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.sm,
     fontSize: 16,
+  },
+  inputError: {
+    borderColor: colors.error,
   },
   multiline: {
     minHeight: MIN_TOUCH_TARGET * 2,

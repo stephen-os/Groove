@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MIN_TOUCH_TARGET, themes, type ThemeColors } from '@/lib/theme';
+import { colors, MIN_TOUCH_TARGET } from '@/lib/theme';
 
 // WCAG 2.1 relative luminance and contrast ratio. Small enough to keep here
 // rather than pull in a dependency, and having it in the test file means the
@@ -27,48 +27,45 @@ const contrast = (a: string, b: string): number => {
 const AA_TEXT = 4.5;
 const AA_UI = 3;
 
-// Pairs the app actually renders. Kept as a function of the theme so both
-// palettes are held to the identical standard — a light theme that quietly
-// skipped a check would be exactly the kind of gap this exists to prevent.
-const textPairs = (t: ThemeColors): [string, string, string][] => [
-  ['fg on bg', t.fg, t.bg],
-  ['fg on surface', t.fg, t.surface],
-  ['fg on bgAlt', t.fg, t.bgAlt],
-  ['muted on bg', t.muted, t.bg],
-  ['muted on surface', t.muted, t.surface],
-  ['muted on bgAlt', t.muted, t.bgAlt],
-  ['accent on bg', t.accent, t.bg],
-  ['accent on surface', t.accent, t.surface],
+// Pairs the app actually renders.
+const textPairs: [string, string, string][] = [
+  ['fg on bg', colors.fg, colors.bg],
+  ['fg on surface', colors.fg, colors.surface],
+  ['fg on bgAlt', colors.fg, colors.bgAlt],
+  ['muted on bg', colors.muted, colors.bg],
+  ['muted on surface', colors.muted, colors.surface],
+  ['muted on bgAlt', colors.muted, colors.bgAlt],
+  ['accent on bg', colors.accent, colors.bg],
+  ['accent on surface', colors.accent, colors.surface],
   // The filled-button case. Easy to get backwards: on a light accent the
-  // readable label is dark, on a dark accent it is light.
-  ['onAccent on accent', t.onAccent, t.accent],
-  ['error on surface', t.error, t.surface],
-  ['success on surface', t.success, t.surface],
-  ['warning on surface', t.warning, t.surface],
+  // readable label is dark, not the page colour.
+  ['onAccent on accent', colors.onAccent, colors.accent],
+  ['error on surface', colors.error, colors.surface],
+  ['success on surface', colors.success, colors.surface],
+  ['warning on surface', colors.warning, colors.surface],
 ];
 
 // 1.4.11 covers the visible boundary of a control, which is why borderStrong
-// exists separately from the decorative border token.
-const uiPairs = (t: ThemeColors): [string, string, string][] => [
-  ['borderStrong on bg', t.borderStrong, t.bg],
-  ['borderStrong on surface', t.borderStrong, t.surface],
-  ['borderStrong on bgAlt', t.borderStrong, t.bgAlt],
+// exists separately from the decorative border token. bgAlt is the tightest of
+// the three and the one an input border actually sits on.
+const uiPairs: [string, string, string][] = [
+  ['borderStrong on bg', colors.borderStrong, colors.bg],
+  ['borderStrong on surface', colors.borderStrong, colors.surface],
+  ['borderStrong on bgAlt', colors.borderStrong, colors.bgAlt],
 ];
 
-describe.each(['light', 'dark'] as const)('%s theme', (name) => {
-  const theme = themes[name];
-
-  it.each(textPairs(theme))('%s meets AA for normal text', (_label, fg, bg) => {
+describe('dark palette', () => {
+  it.each(textPairs)('%s meets AA for normal text', (_label, fg, bg) => {
     expect(contrast(fg, bg)).toBeGreaterThanOrEqual(AA_TEXT);
   });
 
-  it.each(uiPairs(theme))('%s meets AA for UI boundaries', (_label, fg, bg) => {
+  it.each(uiPairs)('%s meets AA for UI boundaries', (_label, fg, bg) => {
     expect(contrast(fg, bg)).toBeGreaterThanOrEqual(AA_UI);
   });
 
   it('uses six-digit hex for every token, which the contrast maths assumes', () => {
-    for (const [token, value] of Object.entries(theme)) {
-      expect(value, `${token} in ${name}`).toMatch(/^#[0-9a-f]{6}$/);
+    for (const [token, value] of Object.entries(colors)) {
+      expect(value, token).toMatch(/^#[0-9a-f]{6}$/);
     }
   });
 });

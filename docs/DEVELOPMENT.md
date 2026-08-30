@@ -175,31 +175,32 @@ Typed routes are on, so `router.push` autocompletes and a typo is a type error.
 
 ### Changing the database
 
-Never edit a migration that has already run on your phone — your device has already
-applied it and never will again, so editing it only changes new installs and the two
-silently diverge.
-
-Append to the `migrations` array in `src/lib/db/schema.ts`:
+`src/lib/db/schema.ts` is the authority on the shape of the data. There is no migration
+list and nothing to append to — edit the `CREATE TABLE` directly:
 
 ```ts
-{
-  version: 4,
-  name: 'add_item_colour',
-  statements: [`ALTER TABLE items ADD COLUMN colour TEXT`],
-}
+`CREATE TABLE habits (
+   ...
+   colour TEXT NOT NULL DEFAULT '',
+ )`,
 ```
 
-Then update the `Item` interface and the row mapping in `src/lib/db/items.ts`, and — if
-the field should survive a backup — the schema and bounds in `src/lib/backup.ts`.
-`npm test` fails if the migration list stops being contiguous.
+On the next launch the fingerprint in `user_version` no longer matches, so `client.ts`
+deletes the database and rebuilds it from `SCHEMA`. **Everything on the phone is
+erased** — export a backup first if the data matters.
 
-To start from an empty database, uninstall the app from the phone and reinstall.
+Then update the `Habit` interface and row mapping in `src/lib/db/habits.ts`, and — if the
+field should survive a backup — the schema and bounds in `src/lib/backup.ts`.
+
+This trade only holds because Groove has never shipped. If it ever does, a real migration
+path has to arrive before the first release, not after.
 
 ### Changing the theme
 
-All colour is in `src/lib/theme.ts`. `npm test` measures every foreground/background
-pair against WCAG AA and fails on a regression, including the light theme — so change a
-colour, run the tests, and let them tell you whether it is legible.
+All colour is in `src/lib/theme.ts`. The app is dark only — there is no light palette and
+no runtime switch. `npm test` measures every foreground/background pair against WCAG AA
+and fails on a regression, so change a colour, run the tests, and let them tell you
+whether it is legible.
 
 ---
 

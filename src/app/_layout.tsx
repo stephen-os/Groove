@@ -5,12 +5,12 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { ThemeProvider, useTheme } from '@/components/layout/ThemeProvider';
 import { getDatabase } from '@/lib/db/client';
 import { configureNotifications } from '@/lib/notifications';
+import { colors, fontSize, spacing } from '@/lib/theme';
 
-// Hold the splash screen until the database has opened and migrated, so the
-// first screen never renders against a schema that isn't there yet. The catch is
+// Hold the splash screen until the database is open and built, so the first
+// screen never renders against tables that aren't there yet. The catch is
 // required: this rejects if the splash has already auto-hidden, which is not an
 // error worth crashing over.
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
@@ -23,8 +23,9 @@ export default function RootLayout() {
   useEffect(() => {
     const prepare = async (): Promise<void> => {
       try {
-        // Opening the database runs any pending migrations. If this throws, the
-        // app has no usable storage and there is nothing sensible to render.
+        // Opening the database builds the schema if it is missing or out of
+        // date. If this throws, the app has no usable storage and there is
+        // nothing sensible to render.
         await getDatabase();
         await configureNotifications();
         setStartup({ status: 'ready' });
@@ -43,16 +44,17 @@ export default function RootLayout() {
 
   if (startup.status === 'loading') return null;
 
-  // Deliberately unthemed and dependency-free: this renders when the database —
-  // which the theme preference is read from — is the thing that failed. A blank
-  // screen here would leave no way to tell a crash from a slow start.
+  // Rendered without any of the app's own components on purpose: this is what
+  // shows when storage itself failed, so it must not depend on anything that
+  // could be part of the failure. The palette is a plain module, so using it
+  // here is safe.
   if (startup.status === 'failed') {
     return (
       <View style={styles.fatal}>
         <RNText style={styles.fatalTitle}>The app could not start</RNText>
         <RNText style={styles.fatalBody}>
-          Its local database failed to open. Reinstalling clears it, which also
-          erases local data — export a backup first if you can.
+          Its local database failed to open. Reinstalling clears it, which also erases local
+          data — export a backup first if you can.
         </RNText>
         <RNText style={styles.fatalDetail}>{startup.message}</RNText>
       </View>
@@ -62,36 +64,21 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={styles.flex}>
       <SafeAreaProvider>
-        <ThemeProvider>
-          <AppStack />
-        </ThemeProvider>
+        {/* The app is dark only, so the status bar icons are always light. */}
+        <StatusBar style="light" />
+        <Stack
+          screenOptions={{
+            headerStyle: { backgroundColor: colors.bg },
+            headerTintColor: colors.fg,
+            contentStyle: { backgroundColor: colors.bg },
+          }}
+        >
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="habit/new" options={{ presentation: 'modal', title: 'New habit' }} />
+          <Stack.Screen name="+not-found" options={{ title: 'Not found' }} />
+        </Stack>
       </SafeAreaProvider>
     </GestureHandlerRootView>
-  );
-}
-
-// Split from RootLayout because it consumes the theme, which means it has to sit
-// inside ThemeProvider rather than alongside it.
-function AppStack() {
-  const { theme, name } = useTheme();
-
-  return (
-    <>
-      {/* Status bar icons invert with the theme; on a dark background they must
-          be light, or the clock disappears. */}
-      <StatusBar style={name === 'dark' ? 'light' : 'dark'} />
-      <Stack
-        screenOptions={{
-          headerStyle: { backgroundColor: theme.bg },
-          headerTintColor: theme.fg,
-          contentStyle: { backgroundColor: theme.bg },
-        }}
-      >
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="habit/new" options={{ presentation: 'modal', title: 'New habit' }} />
-        <Stack.Screen name="+not-found" options={{ title: 'Not found' }} />
-      </Stack>
-    </>
   );
 }
 
@@ -100,11 +87,11 @@ const styles = StyleSheet.create({
   fatal: {
     flex: 1,
     justifyContent: 'center',
-    padding: 24,
-    gap: 12,
-    backgroundColor: '#101011',
+    padding: spacing.lg,
+    gap: spacing.sm,
+    backgroundColor: colors.bg,
   },
-  fatalTitle: { color: '#ededf0', fontSize: 20, fontWeight: '600' },
-  fatalBody: { color: '#9b9ba3', fontSize: 16, lineHeight: 22 },
-  fatalDetail: { color: '#f98a8a', fontSize: 13 },
+  fatalTitle: { color: colors.fg, fontSize: fontSize.lg, fontWeight: '600' },
+  fatalBody: { color: colors.muted, fontSize: fontSize.body, lineHeight: 22 },
+  fatalDetail: { color: colors.error, fontSize: fontSize.sm },
 });

@@ -1,6 +1,5 @@
 import { Text as RNText, type TextProps as RNTextProps } from 'react-native';
-import { useTheme } from '@/components/layout/ThemeProvider';
-import { fontSize } from '@/lib/theme';
+import { colors, fontSize } from '@/lib/theme';
 
 const VARIANTS = {
   title: { fontSize: fontSize.title, fontWeight: '700' },
@@ -9,10 +8,17 @@ const VARIANTS = {
   caption: { fontSize: fontSize.sm, fontWeight: '400' },
 } as const;
 
+const TONES = {
+  default: { color: colors.fg },
+  muted: { color: colors.muted },
+  error: { color: colors.error },
+  accent: { color: colors.accent },
+} as const;
+
 interface TextProps extends RNTextProps {
   variant?: keyof typeof VARIANTS;
   /** 'muted' still meets AA on every background; 'error' for failure messages. */
-  tone?: 'default' | 'muted' | 'error' | 'accent';
+  tone?: keyof typeof TONES;
 }
 
 /**
@@ -24,14 +30,5 @@ interface TextProps extends RNTextProps {
  * common way a mobile app becomes unusable for someone who needs large type.
  */
 export function Text({ variant = 'body', tone = 'default', style, ...rest }: TextProps) {
-  const { theme } = useTheme();
-
-  const color = {
-    default: theme.fg,
-    muted: theme.muted,
-    error: theme.error,
-    accent: theme.accent,
-  }[tone];
-
-  return <RNText style={[VARIANTS[variant], { color }, style]} {...rest} />;
+  return <RNText style={[VARIANTS[variant], TONES[tone], style]} {...rest} />;
 }

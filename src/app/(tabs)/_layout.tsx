@@ -1,22 +1,20 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Tabs } from 'expo-router/js-tabs';
-import { useTheme } from '@/components/layout/ThemeProvider';
+import { colors } from '@/lib/theme';
 
 // Imported from 'expo-router/js-tabs', not from 'expo-router'. The root export
 // is deprecated in SDK 57, and 'expo-router/unstable-native-tabs' is — as the
 // name says — unstable. This is the supported, stable path.
 export default function TabsLayout() {
-  const { theme } = useTheme();
-
   return (
     <Tabs
       screenOptions={{
-        headerStyle: { backgroundColor: theme.bg },
-        headerTintColor: theme.fg,
-        tabBarStyle: { backgroundColor: theme.bgAlt, borderTopColor: theme.border },
-        tabBarActiveTintColor: theme.accent,
-        tabBarInactiveTintColor: theme.muted,
-        sceneStyle: { backgroundColor: theme.bg },
+        headerStyle: { backgroundColor: colors.bg },
+        headerTintColor: colors.fg,
+        tabBarStyle: { backgroundColor: colors.bgAlt, borderTopColor: colors.border },
+        tabBarActiveTintColor: colors.accent,
+        tabBarInactiveTintColor: colors.muted,
+        sceneStyle: { backgroundColor: colors.bg },
       }}
     >
       <Tabs.Screen

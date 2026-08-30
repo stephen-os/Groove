@@ -1,17 +1,17 @@
-# Project
+# Groove
 
-Android-first mobile app. **Expo SDK 57** · **React Native 0.86** · **React 19** ·
-**TypeScript** · **expo-router**. All data is local to the device — no server, no
-accounts, no network.
+A local-only habit tracker for one phone. **Expo SDK 57** · **React Native 0.86** ·
+**React 19** · **TypeScript** · **expo-router**. All data is local to the device —
+no server, no accounts, no network.
 
 > The general engineering standards — structure, TypeScript discipline, composition,
 > security, tooling, the verify loop — live in the **`app-standards` skill**. Read that
-> first. This file covers what is specific to this stack.
+> first. This file covers what is specific to this app.
 
 ```
 src/app         routes (expo-router: the file tree IS the navigation)
-src/components  ui/ primitives, layout/ providers, pages/ screen-specific
-src/lib         theme, db/ (schema + migrations + access), backup, notifications
+src/components  ui/ primitives
+src/lib         theme, date, db/ (schema + access), backup, notifications
 plugins         Expo config plugins (release signing)
 tests           Vitest suites for the pure logic
 assets          app icon, splash, adaptive icon
@@ -21,14 +21,21 @@ docs            DEVELOPMENT.md (build and run) · RELEASE.md (ship it)
 `src/hooks` and `src/types` don't exist yet — create each when its first occupant
 appears. Import by absolute path (`@/...`).
 
-## Starting a new app from this template
+## This app is not shipping
 
-1. `app.json`: set `name`, `slug`, `scheme`, and **`android.package`** — the package
-   name is permanent once published, so change it before the first release build.
-2. `src/lib/theme.ts`: pick your colours, then `npm test` to check contrast.
-3. Replace the `items` domain with the real one — `src/lib/db/schema.ts` migration 1,
-   `src/lib/db/items.ts`, the two screens, and the bounds in `src/lib/backup.ts`.
-4. Replace `assets/images/` (icon, splash, adaptive icon).
+It is in development and will only ever be installed on one phone. Three consequences,
+and they override the usual instincts:
+
+- **The schema is authoritative, not versioned.** `src/lib/db/schema.ts` says what the
+  database *is*. There is no migration list, because there are no older versions in the
+  world. Change a column and `client.ts` rebuilds the database from scratch on the next
+  launch — the fingerprint in `user_version` is a content hash, not a version number.
+  Export a backup first if the data in it matters.
+- **Dead code goes.** If something is not used and will not be used, delete it rather
+  than leaving it for later. `npm run deadcode` enforces this for exports; the same rule
+  applies to anything it cannot see.
+- **Git is a task log.** Commits mark verified checkpoints. There is no release history
+  to protect.
 
 ## Rules specific to this stack
 
@@ -63,25 +70,28 @@ just read. Several of these look correct and fail at runtime.
 
 ### Data
 
-- **All SQL is parameterised.** No exceptions, even for an app only you use — a note
-  containing an apostrophe is enough to break string-built SQL.
-- **Migrations are append-only.** Never edit or reorder one that has run on a device;
-  add a corrective migration instead. `npm test` enforces contiguity.
-- The **decision** logic (which migrations to run, whether a backup is valid) is pure
-  and tested; the SQLite and file-system calls around it are thin wrappers. Keep that
-  split — it is what makes any of this testable without a device.
+- **All SQL is parameterised.** No exceptions, even for an app only you use — a habit
+  name containing an apostrophe is enough to break string-built SQL.
+- **A habit day is a local calendar day**, stored as `'YYYY-MM-DD'`, never a timestamp.
+  `src/lib/date.ts` owns that conversion; `toISOString()` is the wrong answer and looks
+  like the right one.
+- **The weekday bitmask is indexed by `Date.getDay()`** — bit 0 is Sunday. Monday-first
+  is a display concern and lives in `WEEKDAYS`, not in storage.
+- **Habits archive, they don't delete.** `archived_at` keeps their history in the
+  statistics.
+- The **pure decisions** — which habits are due on a day, whether a backup is valid,
+  what a completion rate is — are separated from the SQLite and file-system calls
+  around them. Keep that split; it is what makes any of this testable without a device.
 
 ### Security
 
 - There are no secrets, and there should be none. Anything bundled into the app is
-  readable by anyone who unzips the APK. The moment real credentials are needed, they
-  belong behind a server, not in `app.json` or an `EXPO_PUBLIC_*` variable.
+  readable by anyone who unzips the APK.
 - **The imported backup file is the only untrusted input.** It is parsed with Zod,
-  bounded on every field, and never written until it fully validates. Treat any future
-  import path the same way.
+  bounded on every field, checked for referential integrity, and never written until it
+  fully validates. Treat any future import path the same way.
 - **`release.keystore` and `keystore.properties` must never be committed.** Both are
-  git-ignored; `npm run secrets` scans the tree. A leaked signing key cannot be revoked
-  in any way that helps you.
+  git-ignored; `npm run secrets` scans the tree.
 
 ### Accessibility
 
@@ -94,20 +104,21 @@ The web rules don't translate directly; these are the mobile equivalents.
 - **React Native has no `aria-invalid`.** `AccessibilityState` is only
   `disabled`/`selected`/`checked`/`busy`/`expanded`. Field errors are conveyed with
   `accessibilityHint` plus an `accessibilityLiveRegion` announcement — see `TextField`.
-- Selected state gets `accessibilityRole="radio"` + `accessibilityState={{ checked }}`,
-  never colour alone.
+- Selected state gets a role plus `accessibilityState={{ checked }}`, never colour alone.
 - Labels are wired with `nativeID` + `accessibilityLabelledBy` — the mobile `htmlFor`.
 - Test with **TalkBack** on a real device.
 
 ### Theming
 
+- The app is **dark only**. There is no light palette, no theme provider and no runtime
+  switch, so `colors` is a plain object imported directly and styles go straight into
+  `StyleSheet.create`.
 - All colour lives in `src/lib/theme.ts`. No hex values in components.
 - `border` is decorative; **`borderStrong` is for control boundaries** and is the only
   one that meets the 3:1 of WCAG 1.4.11.
-- `onAccent` is the text colour *on* the accent fill, and is not the background colour —
-  on a light accent it's light, on a dark accent it's dark.
-- Contrast is asserted in `tests/lib/theme.test.ts` for **both** themes, including
-  against `bgAlt`, which is the tightest pairing and the one an input border uses.
+- `onAccent` is the text colour *on* the accent fill — on a light accent it's dark.
+- Contrast is asserted in `tests/lib/theme.test.ts`, including against `bgAlt`, which is
+  the tightest pairing and the one an input border uses.
 
 ## Verify
 

@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
-import { ThemePicker } from '@/components/pages/settings/ThemePicker';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Screen } from '@/components/ui/Screen';
@@ -40,14 +39,6 @@ export default function SettingsScreen() {
   return (
     <Screen edgeToEdgeBottom>
       <ScrollView contentContainerStyle={styles.content}>
-        <Card>
-          <Text variant="heading">Appearance</Text>
-          <Text tone="muted">System follows your device&apos;s light or dark setting.</Text>
-          <View style={styles.spacer}>
-            <ThemePicker />
-          </View>
-        </Card>
-
         <Card>
           <Text variant="heading">Backup</Text>
           <Text tone="muted">
@@ -94,6 +85,5 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   content: { gap: spacing.md, paddingVertical: spacing.md },
-  spacer: { marginTop: spacing.sm },
   actions: { gap: spacing.sm, marginTop: spacing.sm },
 });

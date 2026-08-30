@@ -1,13 +1,12 @@
 import { Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
-import { useTheme } from '@/components/layout/ThemeProvider';
 import { Text } from '@/components/ui/Text';
-import { MIN_TOUCH_TARGET, radius, spacing } from '@/lib/theme';
+import { colors, MIN_TOUCH_TARGET, radius, spacing } from '@/lib/theme';
 
 interface ButtonProps {
   label: string;
   onPress: () => void;
   /** 'primary' fills with the accent; 'secondary' is outlined; 'danger' is destructive. */
-  tone?: 'primary' | 'secondary' | 'danger';
+  tone?: keyof typeof TONES;
   disabled?: boolean;
   /**
    * Longer description for screen readers, when the label alone is ambiguous
@@ -16,6 +15,14 @@ interface ButtonProps {
   accessibilityHint?: string;
   style?: ViewStyle;
 }
+
+// On a filled button the readable foreground is `onAccent`, not the page colour
+// — see theme.ts. Outlined buttons draw their label in normal text.
+const TONES = {
+  primary: { backgroundColor: colors.accent, borderColor: colors.accent, color: colors.onAccent },
+  secondary: { backgroundColor: 'transparent', borderColor: colors.borderStrong, color: colors.fg },
+  danger: { backgroundColor: colors.error, borderColor: colors.error, color: colors.onAccent },
+} as const;
 
 /**
  * The app's only button.
@@ -32,17 +39,7 @@ export function Button({
   accessibilityHint,
   style,
 }: ButtonProps) {
-  const { theme } = useTheme();
-
-  const background = {
-    primary: theme.accent,
-    secondary: 'transparent',
-    danger: theme.error,
-  }[tone];
-
-  // On a filled button the readable foreground is `onAccent`, not the page
-  // colour — see theme.ts. Outlined buttons draw their label in normal text.
-  const labelColor = tone === 'secondary' ? theme.fg : theme.onAccent;
+  const { color, ...surface } = TONES[tone];
 
   return (
     <Pressable
@@ -55,18 +52,15 @@ export function Button({
       accessibilityHint={accessibilityHint}
       style={({ pressed }) => [
         styles.base,
-        {
-          backgroundColor: background,
-          borderColor: tone === 'secondary' ? theme.borderStrong : background,
-          opacity: disabled ? 0.5 : pressed ? 0.85 : 1,
-        },
+        surface,
+        { opacity: disabled ? 0.5 : pressed ? 0.85 : 1 },
         style,
       ]}
     >
       {/* The label is centred in a full-height row so the touch target stays
           48dp even when the text itself is short. */}
       <View style={styles.content}>
-        <Text variant="body" style={{ color: labelColor, fontWeight: '600' }}>
+        <Text variant="body" style={{ color, fontWeight: '600' }}>
           {label}
         </Text>
       </View>

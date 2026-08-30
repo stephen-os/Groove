@@ -6,7 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "groove",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "dark",
     "android": {
       "package": "com.stephen.groove",
       "versionCode": 1,

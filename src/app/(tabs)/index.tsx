@@ -2,7 +2,6 @@ import { useCallback, useState } from 'react';
 import { Alert, FlatList, Pressable, StyleSheet, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useTheme } from '@/components/layout/ThemeProvider';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Screen } from '@/components/ui/Screen';
@@ -11,7 +10,7 @@ import { fromDayKey, todayKey, WEEKDAYS } from '@/lib/date';
 import { completedOn, setDone } from '@/lib/db/completions';
 import { archiveHabit, listHabits, type Habit } from '@/lib/db/habits';
 import { getActiveProfileId } from '@/lib/db/profiles';
-import { MIN_TOUCH_TARGET, radius, spacing } from '@/lib/theme';
+import { colors, MIN_TOUCH_TARGET, radius, spacing } from '@/lib/theme';
 
 // Every active habit is listed here, whatever its schedule. Filtering the list
 // down to the ones actually due today is `habitsDueOn`, which is the next piece
@@ -30,7 +29,6 @@ const describeSchedule = (habit: Habit): string => {
 
 export default function TodayScreen() {
   const router = useRouter();
-  const { theme } = useTheme();
   const [habits, setHabits] = useState<Habit[]>([]);
   const [done, setDoneIds] = useState<Set<number>>(new Set());
   const [loaded, setLoaded] = useState(false);
@@ -143,17 +141,11 @@ export default function TodayScreen() {
                   accessibilityState={{ checked }}
                   accessibilityLabel={item.name}
                   accessibilityHint={describeSchedule(item)}
-                  style={[
-                    styles.checkbox,
-                    {
-                      backgroundColor: checked ? theme.accent : 'transparent',
-                      borderColor: checked ? theme.accent : theme.borderStrong,
-                    },
-                  ]}
+                  style={[styles.checkbox, checked ? styles.checkboxOn : styles.checkboxOff]}
                 >
                   {/* Decorative: the checked state is already announced by the
                       checkbox role, so the tick must not be read out again. */}
-                  {checked && <Ionicons name="checkmark" size={22} color={theme.onAccent} />}
+                  {checked && <Ionicons name="checkmark" size={22} color={colors.onAccent} />}
                 </Pressable>
 
                 <View style={styles.labels}>
@@ -197,6 +189,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  checkboxOn: { backgroundColor: colors.accent, borderColor: colors.accent },
+  checkboxOff: { backgroundColor: 'transparent', borderColor: colors.borderStrong },
   labels: { flex: 1, gap: spacing.xs },
   archiveButton: { marginTop: spacing.sm },
   newButton: { marginBottom: spacing.md },

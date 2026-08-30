@@ -1,13 +1,18 @@
 // The single source of colour and spacing for the app. Nothing else defines a
 // hex value or a magic pixel number.
 //
-// Same two-layer shape as the web template: a named raw palette, then semantic
-// tokens pointing at it, so a token's meaning and its actual colour are both
-// visible in one place. Swap `accent` and the app rebrands.
+// Groove is dark, full stop — there is no light palette and no runtime switch,
+// so `colors` is a plain object rather than something resolved through a
+// provider. That means a component can import it directly and its styles can go
+// straight into `StyleSheet.create`, which is both simpler and cheaper than
+// rebuilding style objects on every render.
+//
+// Two layers: a named raw palette, then semantic tokens pointing at it, so a
+// token's meaning and its actual colour are both visible in one place. Swap
+// `accent` and the app rebrands.
 //
 // Every pair is measured, not eyeballed — `tests/lib/theme.test.ts` asserts the
-// WCAG AA ratios and fails the verify loop on a regression. Change a colour and
-// the tests tell you whether it is legible.
+// WCAG AA ratios and fails the verify loop on a regression.
 
 // 1. Raw palette. Not exported: components reference semantic tokens only.
 const ash = {
@@ -20,33 +25,15 @@ const ash = {
   50: '#ededf0',
 } as const;
 
-const paper = {
-  0: '#ffffff',
-  50: '#f7f7f8',
-  100: '#eeeef0',
-  200: '#dcdce0',
-  // Measured against bgAlt (#eeeef0), not just the page: an input's border sits
-  // on the recessed background, which is the tightest of the three and the only
-  // one that actually fails. #8a8a94 clears 3:1 on bg and surface but lands at
-  // 2.95 here.
-  400: '#84848e',
-  600: '#5f5f68',
-  950: '#17171a',
-} as const;
-
 const hue = {
   azure: '#7aa7ff',
-  cobalt: '#2159d4',
   sage: '#5bd88a',
-  forest: '#146138',
   rose: '#f98a8a',
-  brick: '#a81f1f',
   gold: '#f5c14b',
-  bronze: '#7a5000',
 } as const;
 
 // 2. Semantic tokens.
-export interface ThemeColors {
+export interface Colors {
   /** Screen background. */
   bg: string;
   /** Recessed surfaces — inputs, grouped list backgrounds. */
@@ -62,45 +49,30 @@ export interface ThemeColors {
   /** Control boundaries and focus indicators. Meets 3:1 (WCAG 1.4.11). */
   borderStrong: string;
   accent: string;
-  /** Text/icons drawn ON the accent colour. Not always the background colour. */
+  /** Text and icons drawn ON the accent fill — light accent, dark label. */
   onAccent: string;
+  /** A habit met its target. */
   success: string;
+  /** A destructive action, or a field that failed validation. */
   error: string;
+  /** A habit below its target but not yet failing. */
   warning: string;
 }
 
-export const themes: Record<'light' | 'dark', ThemeColors> = {
-  dark: {
-    bg: ash[950],
-    bgAlt: ash[975],
-    surface: ash[900],
-    fg: ash[50],
-    muted: ash[400],
-    border: ash[800],
-    borderStrong: ash[700],
-    accent: hue.azure,
-    onAccent: ash[950],
-    success: hue.sage,
-    error: hue.rose,
-    warning: hue.gold,
-  },
-  light: {
-    bg: paper[50],
-    bgAlt: paper[100],
-    surface: paper[0],
-    fg: paper[950],
-    muted: paper[600],
-    border: paper[200],
-    borderStrong: paper[400],
-    accent: hue.cobalt,
-    onAccent: paper[50],
-    success: hue.forest,
-    error: hue.brick,
-    warning: hue.bronze,
-  },
+export const colors: Colors = {
+  bg: ash[950],
+  bgAlt: ash[975],
+  surface: ash[900],
+  fg: ash[50],
+  muted: ash[400],
+  border: ash[800],
+  borderStrong: ash[700],
+  accent: hue.azure,
+  onAccent: ash[950],
+  success: hue.sage,
+  error: hue.rose,
+  warning: hue.gold,
 };
-
-export type ThemeName = keyof typeof themes;
 
 /** 4pt grid. Use these rather than raw numbers so rhythm stays consistent. */
 export const spacing = {
