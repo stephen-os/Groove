@@ -77,17 +77,16 @@ export async function replaceData(data: GrooveData): Promise<void> {
     for (const habit of data.habits) {
       await db.runAsync(
         `INSERT INTO habits (
-           id, profile_id, name, icon, color, sort_order, schedule_kind,
+           id, profile_id, name, icon, color, schedule_kind,
            weekday_mask, target_count, due_time, remind_enabled, follow_ups,
            target_pct, starts_on, archived_at, created_at, updated_at
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           habit.id,
           habit.profileId,
           habit.name,
           habit.icon,
           habit.color,
-          habit.sortOrder,
           habit.scheduleKind,
           habit.weekdayMask,
           habit.targetCount,

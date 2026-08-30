@@ -16,7 +16,7 @@ import {
 } from '@/lib/db/habits';
 import { getActiveProfileId } from '@/lib/db/profiles';
 import { syncReminders } from '@/lib/reminders';
-import { describeSchedule } from '@/lib/schedule';
+import { describeSchedule, groupByDueTime } from '@/lib/schedule';
 import { colors, MIN_TOUCH_TARGET, spacing } from '@/lib/theme';
 
 export default function ManageHabitsScreen() {
@@ -30,7 +30,11 @@ export default function ManageHabitsScreen() {
       listHabits(profileId),
       listArchivedHabits(profileId),
     ]);
-    setActive(live);
+    // Same order the Today screen uses — earliest due time first, then by name —
+    // so the two screens never disagree about where a habit sits.
+    setActive(groupByDueTime(live.map((habit) => ({ habit }))).flatMap((group) =>
+      group.data.map((row) => row.habit)
+    ));
     setArchived(retired);
   }, []);
 

@@ -195,6 +195,56 @@ export function expectedByNow(target: number, period: DayRange, today: DayKey): 
   return Math.floor((target * elapsed) / daysInRange(period));
 }
 
+/** Anything carrying a habit — the shape `groupByDueTime` needs. */
+export interface HasHabit {
+  readonly habit: Habit;
+}
+
+export interface DueTimeGroup<T> {
+  /** 'HH:MM', or null for the habits with no time attached. */
+  readonly dueTime: string | null;
+  readonly data: T[];
+}
+
+/**
+ * Groups habits under the time they are due, earliest first.
+ *
+ * The time is the heading rather than something repeated on every row, so a
+ * morning reads as one block: everything under 7:00 is what 7:00 asks of you.
+ * Habits with no due time fall into a single trailing group — they are due
+ * today, just not at any particular moment.
+ *
+ * Within a group the order is alphabetical. There is no manual ordering to
+ * store: two habits at 7:00 sharp have no meaningful precedence, and a stable
+ * rule beats an arbitrary one you have to maintain by hand.
+ *
+ * 'HH:MM' is zero-padded and 24-hour, so a plain string comparison is already
+ * chronological — no parsing needed to sort.
+ */
+export function groupByDueTime<T extends HasHabit>(rows: readonly T[]): DueTimeGroup<T>[] {
+  const buckets = new Map<string, T[]>();
+  for (const row of rows) {
+    // '' stands in for "no due time" so the map has one key type; it sorts last
+    // by the comparator below rather than by its value.
+    const key = row.habit.dueTime ?? '';
+    const bucket = buckets.get(key);
+    if (bucket) bucket.push(row);
+    else buckets.set(key, [row]);
+  }
+
+  return [...buckets.entries()]
+    .sort(([a], [b]) => {
+      if (a === b) return 0;
+      if (a === '') return 1;
+      if (b === '') return -1;
+      return a < b ? -1 : 1;
+    })
+    .map(([key, data]) => ({
+      dueTime: key === '' ? null : key,
+      data: [...data].sort((x, y) => x.habit.name.localeCompare(y.habit.name)),
+    }));
+}
+
 /** A one-line description of when a habit happens, for the UI. */
 export function describeSchedule(habit: Habit): string {
   if (habit.scheduleKind === 'weekly') return `${habit.targetCount}x per week`;

@@ -23,7 +23,6 @@ const habit = (overrides: Partial<Habit> = {}): Habit => ({
   name: 'Brush teeth',
   icon: '',
   color: '',
-  sortOrder: 0,
   scheduleKind: 'daily',
   weekdayMask: EVERY_DAY,
   targetCount: 1,

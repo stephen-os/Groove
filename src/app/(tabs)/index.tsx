@@ -5,7 +5,7 @@ import { HabitCheckRow } from '@/components/pages/habit/HabitCheckRow';
 import { Button } from '@/components/ui/Button';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
-import { fromDayKey, todayKey } from '@/lib/date';
+import { formatTime, fromDayKey, todayKey } from '@/lib/date';
 import {
   completionsBetween,
   setStatus,
@@ -17,6 +17,7 @@ import { getActiveProfileId } from '@/lib/db/profiles';
 import { cancelDayChain, syncReminders } from '@/lib/reminders';
 import {
   describeSchedule,
+  groupByDueTime,
   habitsDueOn,
   indexCompletions,
   isEmpty,
@@ -85,34 +86,28 @@ export default function TodayScreen() {
     [habits, completions, day]
   );
 
+  // One flat list, grouped by the time each habit is due rather than by how it
+  // is scheduled. A weekly habit due at 7:00 belongs to the morning alongside
+  // the daily ones; what makes it weekly is already on its own row.
   const sections = useMemo(() => {
-    const built: { title: string; data: Row[] }[] = [];
-    if (due.daily.length > 0) {
-      built.push({
-        title: 'Today',
-        data: due.daily.map((entry) => ({
-          habit: entry.habit,
-          done: entry.done,
-          skipped: entry.skipped,
-        })),
-      });
-    }
-    for (const [title, entries] of [
-      ['This week', due.weekly],
-      ['This month', due.monthly],
-    ] as const) {
-      if (entries.length === 0) continue;
-      built.push({
-        title,
-        data: entries.map((entry) => ({
-          habit: entry.habit,
-          done: entry.done,
-          skipped: entry.skipped,
-          pace: paceLabel(entry, day),
-        })),
-      });
-    }
-    return built;
+    const rows: Row[] = [
+      ...due.daily.map((entry) => ({
+        habit: entry.habit,
+        done: entry.done,
+        skipped: entry.skipped,
+      })),
+      ...[...due.weekly, ...due.monthly].map((entry) => ({
+        habit: entry.habit,
+        done: entry.done,
+        skipped: entry.skipped,
+        pace: paceLabel(entry, day),
+      })),
+    ];
+
+    return groupByDueTime(rows).map((group) => ({
+      title: group.dueTime === null ? 'Anytime today' : formatTime(group.dueTime),
+      data: group.data,
+    }));
   }, [due, day]);
 
   const mark = useCallback(

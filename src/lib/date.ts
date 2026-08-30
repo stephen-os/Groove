@@ -57,6 +57,20 @@ export function atTimeOn(key: DayKey, time: string): Date {
   return new Date(year, month - 1, day, hours, minutes, 0, 0);
 }
 
+/**
+ * An 'HH:MM' wall clock rendered the way the device writes times.
+ *
+ * The date is arbitrary — only the time is read — but it has to be a real one,
+ * because `toLocaleTimeString` has nothing else to format.
+ */
+export function formatTime(time: string): string {
+  const [hours, minutes] = time.split(':').map(Number);
+  return new Date(2000, 0, 1, hours, minutes).toLocaleTimeString(undefined, {
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
 /** Day of the week for a day key, numbered as `Date.getDay()`: 0 is Sunday. */
 export function weekdayOf(key: DayKey): number {
   return fromDayKey(key).getDay();

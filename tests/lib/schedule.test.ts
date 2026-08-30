@@ -11,6 +11,7 @@ import {
   isActiveOn,
   effectiveTarget,
   expectedByNow,
+  groupByDueTime,
   isEmpty,
   monthRange,
   weekRange,
@@ -34,7 +35,6 @@ const habit = (overrides: Partial<Habit> & { scheduleKind?: ScheduleKind } = {})
   name: 'Habit',
   icon: '',
   color: '',
-  sortOrder: 0,
   scheduleKind: 'daily',
   weekdayMask: EVERY_DAY,
   targetCount: 1,
@@ -365,5 +365,53 @@ describe('describeSchedule', () => {
     expect(describeSchedule(habit({ scheduleKind: 'monthly', targetCount: 2 }))).toBe(
       '2x per month'
     );
+  });
+});
+
+
+describe('groupByDueTime', () => {
+  const row = (name: string, dueTime: string | null) => ({ habit: habit({ name, dueTime }) });
+
+  it('orders groups by time of day, earliest first', () => {
+    const groups = groupByDueTime([
+      row('Evening walk', '21:00'),
+      row('Brush teeth', '07:00'),
+      row('Lunch walk', '12:30'),
+    ]);
+    expect(groups.map((group) => group.dueTime)).toEqual(['07:00', '12:30', '21:00']);
+  });
+
+  it('sorts alphabetically inside a group', () => {
+    const groups = groupByDueTime([
+      row('Vitamins', '07:00'),
+      row('Brush teeth', '07:00'),
+      row('Make bed', '07:00'),
+    ]);
+    expect(groups[0].data.map((entry) => entry.habit.name)).toEqual([
+      'Brush teeth',
+      'Make bed',
+      'Vitamins',
+    ]);
+  });
+
+  it('puts the untimed habits last, however early they sort as text', () => {
+    const groups = groupByDueTime([row('Anytime thing', null), row('Brush teeth', '07:00')]);
+    expect(groups.map((group) => group.dueTime)).toEqual(['07:00', null]);
+  });
+
+  it('gathers every untimed habit into one group, sorted by name', () => {
+    const groups = groupByDueTime([row('Read', null), row('Gym', null), row('Teeth', '07:00')]);
+    expect(groups).toHaveLength(2);
+    expect(groups[1].data.map((entry) => entry.habit.name)).toEqual(['Gym', 'Read']);
+  });
+
+  it('sorts times numerically rather than by hour digit', () => {
+    // '09:00' before '10:00' works as a string only because HH is zero-padded.
+    const groups = groupByDueTime([row('Ten', '10:00'), row('Nine', '09:00')]);
+    expect(groups.map((group) => group.dueTime)).toEqual(['09:00', '10:00']);
+  });
+
+  it('is empty for no rows', () => {
+    expect(groupByDueTime([])).toEqual([]);
   });
 });

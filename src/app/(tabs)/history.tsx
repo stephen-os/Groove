@@ -5,7 +5,7 @@ import { useFocusEffect } from 'expo-router';
 import { HabitCheckRow } from '@/components/pages/habit/HabitCheckRow';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
-import { addDays, fromDayKey, toDayKey, todayKey, WEEKDAYS } from '@/lib/date';
+import { addDays, formatTime, fromDayKey, toDayKey, todayKey, WEEKDAYS } from '@/lib/date';
 import {
   completionsBetween,
   setStatus,
@@ -17,6 +17,7 @@ import { getActiveProfileId } from '@/lib/db/profiles';
 import { syncReminders } from '@/lib/reminders';
 import {
   describeSchedule,
+  groupByDueTime,
   habitsDueOn,
   indexCompletions,
   isEmpty,
@@ -132,27 +133,23 @@ export default function HistoryScreen() {
   };
 
   // Progress is attached where the shape is still known, rather than recovered
-  // afterwards by testing which fields an entry happens to have.
-  const rows = [
+  // afterwards by testing which fields an entry happens to have. Grouped by due
+  // time, exactly as Today is, so a past day reads the way it did when it was
+  // the present one.
+  const groups = groupByDueTime([
     ...due.daily.map((entry) => ({
       habit: entry.habit,
       done: entry.done,
       skipped: entry.skipped,
       pace: undefined as string | undefined,
     })),
-    ...due.weekly.map((entry) => ({
+    ...[...due.weekly, ...due.monthly].map((entry) => ({
       habit: entry.habit,
       done: entry.done,
       skipped: entry.skipped,
       pace: paceLabel(entry, selected),
     })),
-    ...due.monthly.map((entry) => ({
-      habit: entry.habit,
-      done: entry.done,
-      skipped: entry.skipped,
-      pace: paceLabel(entry, selected),
-    })),
-  ];
+  ]);
 
   return (
     <Screen edgeToEdgeBottom>
@@ -250,17 +247,24 @@ export default function HistoryScreen() {
         {isEmpty(due) ? (
           <Text tone="muted">Nothing was scheduled that day.</Text>
         ) : (
-          rows.map((row) => (
-            <HabitCheckRow
-              key={row.habit.id}
-              name={row.habit.name}
-              schedule={describeSchedule(row.habit)}
-              done={row.done}
-              skipped={row.skipped}
-              pace={row.pace}
-              onToggle={() => mark(row.habit.id, row.done ? null : 'done')}
-              onSkip={() => mark(row.habit.id, row.skipped ? null : 'skipped')}
-            />
+          groups.map((group) => (
+            <View key={group.dueTime ?? 'anytime'} style={styles.group}>
+              <Text variant="caption" tone="muted" style={styles.groupLabel}>
+                {(group.dueTime === null ? 'Anytime' : formatTime(group.dueTime)).toUpperCase()}
+              </Text>
+              {group.data.map((row) => (
+                <HabitCheckRow
+                  key={row.habit.id}
+                  name={row.habit.name}
+                  schedule={describeSchedule(row.habit)}
+                  done={row.done}
+                  skipped={row.skipped}
+                  pace={row.pace}
+                  onToggle={() => mark(row.habit.id, row.done ? null : 'done')}
+                  onSkip={() => mark(row.habit.id, row.skipped ? null : 'skipped')}
+                />
+              ))}
+            </View>
           ))
         )}
       </ScrollView>
@@ -293,4 +297,6 @@ const styles = StyleSheet.create({
   barTrack: { width: '55%', height: 3, borderRadius: 2, backgroundColor: colors.border },
   barFill: { height: 3, borderRadius: 2 },
   selectedLabel: { marginTop: spacing.md, letterSpacing: 1 },
+  group: { gap: spacing.sm },
+  groupLabel: { marginTop: spacing.xs, letterSpacing: 1 },
 });

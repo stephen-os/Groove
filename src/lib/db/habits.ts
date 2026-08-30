@@ -17,7 +17,6 @@ export interface Habit {
   name: string;
   icon: string;
   color: string;
-  sortOrder: number;
   scheduleKind: ScheduleKind;
   /** Bitmask indexed by `Date.getDay()`; bit 0 is Sunday. */
   weekdayMask: number;
@@ -43,7 +42,6 @@ interface HabitRow {
   name: string;
   icon: string;
   color: string;
-  sort_order: number;
   schedule_kind: string;
   weekday_mask: number;
   target_count: number;
@@ -75,7 +73,6 @@ export const toHabit = (row: HabitRow): Habit => ({
   name: row.name,
   icon: row.icon,
   color: row.color,
-  sortOrder: row.sort_order,
   scheduleKind: toScheduleKind(row.schedule_kind),
   weekdayMask: row.weekday_mask,
   targetCount: row.target_count,
@@ -90,7 +87,7 @@ export const toHabit = (row: HabitRow): Habit => ({
 });
 
 const SELECT_COLUMNS =
-  'id, profile_id, name, icon, color, sort_order, schedule_kind, weekday_mask, target_count, due_time, remind_enabled, follow_ups, target_pct, starts_on, archived_at, created_at, updated_at';
+  'id, profile_id, name, icon, color, schedule_kind, weekday_mask, target_count, due_time, remind_enabled, follow_ups, target_pct, starts_on, archived_at, created_at, updated_at';
 
 /** The active (non-archived) habits in a profile, in display order. */
 export async function listHabits(profileId: number): Promise<Habit[]> {
@@ -98,7 +95,7 @@ export async function listHabits(profileId: number): Promise<Habit[]> {
   const rows = await db.getAllAsync<HabitRow>(
     `SELECT ${SELECT_COLUMNS} FROM habits
      WHERE profile_id = ? AND archived_at IS NULL
-     ORDER BY sort_order, id`,
+     ORDER BY name`,
     [profileId]
   );
   return rows.map(toHabit);
@@ -125,7 +122,7 @@ export async function listArchivedHabits(profileId: number): Promise<Habit[]> {
 export async function listHabitsWithArchived(profileId: number): Promise<Habit[]> {
   const db = await getDatabase();
   const rows = await db.getAllAsync<HabitRow>(
-    `SELECT ${SELECT_COLUMNS} FROM habits WHERE profile_id = ? ORDER BY sort_order, id`,
+    `SELECT ${SELECT_COLUMNS} FROM habits WHERE profile_id = ? ORDER BY name`,
     [profileId]
   );
   return rows.map(toHabit);
@@ -157,16 +154,13 @@ export async function createHabit(profileId: number, input: HabitInput): Promise
   const db = await getDatabase();
   const now = Date.now();
 
-  // sort_order is derived in the statement rather than read first: two rapid
-  // taps would otherwise both read the same max and land on the same position.
   const result = await db.runAsync(
     `INSERT INTO habits (
        profile_id, name, schedule_kind, weekday_mask, target_count,
        due_time, remind_enabled, follow_ups, target_pct, starts_on,
-       created_at, updated_at, sort_order
+       created_at, updated_at
      )
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-       (SELECT COALESCE(MAX(sort_order), -1) + 1 FROM habits WHERE profile_id = ?))`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       profileId,
       input.name,
@@ -180,7 +174,6 @@ export async function createHabit(profileId: number, input: HabitInput): Promise
       todayKey(),
       now,
       now,
-      profileId,
     ]
   );
 

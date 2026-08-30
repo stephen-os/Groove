@@ -26,7 +26,6 @@ export const SCHEMA: readonly string[] = [
     name           TEXT    NOT NULL,
     icon           TEXT    NOT NULL DEFAULT '',
     color          TEXT    NOT NULL DEFAULT '',
-    sort_order     INTEGER NOT NULL DEFAULT 0,
     -- 'daily' | 'weekly' | 'monthly'. Daily reads weekday_mask; weekly and
     -- monthly read target_count and ignore the mask entirely.
     schedule_kind  TEXT    NOT NULL,
@@ -56,7 +55,7 @@ export const SCHEMA: readonly string[] = [
     created_at     INTEGER NOT NULL,
     updated_at     INTEGER NOT NULL
   )`,
-  `CREATE INDEX idx_habits_profile ON habits (profile_id, sort_order)`,
+  `CREATE INDEX idx_habits_profile ON habits (profile_id)`,
 
   // A completion is a local calendar day, not an instant. Storing 'YYYY-MM-DD'
   // means crossing a timezone cannot shift yesterday's checkmark onto the day

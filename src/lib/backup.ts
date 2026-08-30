@@ -44,7 +44,6 @@ const HabitSchema = z.strictObject({
   name: z.string().max(MAX_NAME),
   icon: z.string().max(32),
   color: z.string().max(32),
-  sortOrder: z.number().int(),
   scheduleKind: z.enum(['daily', 'weekly', 'monthly']),
   // Seven bits, so anything outside 0–127 is not a week.
   weekdayMask: z.number().int().min(0).max(127),
