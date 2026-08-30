@@ -100,56 +100,106 @@ export async function listHabits(profileId: number): Promise<Habit[]> {
   return rows.map(toHabit);
 }
 
-export interface NewHabit {
-  profileId: number;
+/** The archived habits in a profile, most recently archived first. */
+export async function listArchivedHabits(profileId: number): Promise<Habit[]> {
+  const db = await getDatabase();
+  const rows = await db.getAllAsync<HabitRow>(
+    `SELECT ${SELECT_COLUMNS} FROM habits
+     WHERE profile_id = ? AND archived_at IS NOT NULL
+     ORDER BY archived_at DESC`,
+    [profileId]
+  );
+  return rows.map(toHabit);
+}
+
+export async function getHabit(id: number): Promise<Habit | null> {
+  const db = await getDatabase();
+  const row = await db.getFirstAsync<HabitRow>(
+    `SELECT ${SELECT_COLUMNS} FROM habits WHERE id = ?`,
+    [id]
+  );
+  return row ? toHabit(row) : null;
+}
+
+/** The fields a habit's form owns. Everything else is bookkeeping. */
+export interface HabitInput {
   name: string;
   scheduleKind: ScheduleKind;
   weekdayMask: number;
   targetCount: number;
+  dueTime: string | null;
+  remindEnabled: boolean;
+  targetPct: number;
 }
 
 /** Inserts a habit and returns it as stored, including the id SQLite assigned. */
-export async function createHabit(input: NewHabit): Promise<Habit> {
+export async function createHabit(profileId: number, input: HabitInput): Promise<Habit> {
   const db = await getDatabase();
   const now = Date.now();
-  const startsOn = todayKey();
 
   // sort_order is derived in the statement rather than read first: two rapid
   // taps would otherwise both read the same max and land on the same position.
   const result = await db.runAsync(
     `INSERT INTO habits (
        profile_id, name, schedule_kind, weekday_mask, target_count,
-       starts_on, created_at, updated_at, sort_order
+       due_time, remind_enabled, target_pct, starts_on, created_at, updated_at, sort_order
      )
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
        (SELECT COALESCE(MAX(sort_order), -1) + 1 FROM habits WHERE profile_id = ?))`,
     [
-      input.profileId,
+      profileId,
       input.name,
       input.scheduleKind,
       input.weekdayMask,
       input.targetCount,
-      startsOn,
+      input.dueTime,
+      input.remindEnabled ? 1 : 0,
+      input.targetPct,
+      todayKey(),
       now,
       now,
-      input.profileId,
+      profileId,
     ]
   );
 
-  const row = await db.getFirstAsync<HabitRow>(
-    `SELECT ${SELECT_COLUMNS} FROM habits WHERE id = ?`,
-    [result.lastInsertRowId]
+  const habit = await getHabit(result.lastInsertRowId);
+  if (!habit) throw new Error('The habit vanished immediately after being inserted.');
+  return habit;
+}
+
+/**
+ * Applies an edit to an existing habit.
+ *
+ * `starts_on` is deliberately untouched. Moving it would rewrite how every past
+ * day is judged, and an edit made today should not change what last month looked
+ * like.
+ */
+export async function updateHabit(id: number, input: HabitInput): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync(
+    `UPDATE habits SET
+       name = ?, schedule_kind = ?, weekday_mask = ?, target_count = ?,
+       due_time = ?, remind_enabled = ?, target_pct = ?, updated_at = ?
+     WHERE id = ?`,
+    [
+      input.name,
+      input.scheduleKind,
+      input.weekdayMask,
+      input.targetCount,
+      input.dueTime,
+      input.remindEnabled ? 1 : 0,
+      input.targetPct,
+      Date.now(),
+      id,
+    ]
   );
-  if (!row) throw new Error('The habit vanished immediately after being inserted.');
-  return toHabit(row);
 }
 
 /**
  * Retires a habit without destroying its history.
  *
  * The rows in `completions` stay, so the analytics still know that the gym was
- * attended forty times before it was given up on. A hard delete exists too, but
- * it belongs behind a warning rather than behind the ordinary remove button.
+ * attended forty times before it was given up on.
  */
 export async function archiveHabit(id: number): Promise<void> {
   const db = await getDatabase();
@@ -159,4 +209,25 @@ export async function archiveHabit(id: number): Promise<void> {
     now,
     id,
   ]);
+}
+
+/** Brings an archived habit back. Archiving is a mistake worth being able to undo. */
+export async function restoreHabit(id: number): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync('UPDATE habits SET archived_at = NULL, updated_at = ? WHERE id = ?', [
+    Date.now(),
+    id,
+  ]);
+}
+
+/**
+ * Erases a habit and every day it was ever completed.
+ *
+ * The cascade in the schema does the second half. This is the one that actually
+ * loses data, which is why the UI puts it behind a different warning from
+ * archiving.
+ */
+export async function deleteHabit(id: number): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync('DELETE FROM habits WHERE id = ?', [id]);
 }

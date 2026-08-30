@@ -28,19 +28,18 @@ export const toCompletion = (row: CompletionRow): Completion => ({
 });
 
 /**
- * The habits completed on a given day, as a set of ids.
+ * Every completion between two days, inclusive.
  *
- * A set rather than a list of rows: every caller is asking "is this one ticked",
- * and handing the screen the shape it actually needs keeps the lookup out of the
- * render path.
+ * Day keys are ISO-ordered, so a string comparison is a chronological one and
+ * SQLite can answer this straight off the index rather than parsing dates.
  */
-export async function completedOn(day: DayKey): Promise<Set<number>> {
+export async function completionsBetween(from: DayKey, to: DayKey): Promise<Completion[]> {
   const db = await getDatabase();
-  const rows = await db.getAllAsync<{ habit_id: number }>(
-    'SELECT habit_id FROM completions WHERE day = ?',
-    [day]
+  const rows = await db.getAllAsync<CompletionRow>(
+    'SELECT id, habit_id, day, done_at FROM completions WHERE day >= ? AND day <= ?',
+    [from, to]
   );
-  return new Set(rows.map((row) => row.habit_id));
+  return rows.map(toCompletion);
 }
 
 /**
