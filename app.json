@@ -1,0 +1,45 @@
+{
+  "expo": {
+    "name": "Groove",
+    "slug": "groove",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "groove",
+    "userInterfaceStyle": "automatic",
+    "android": {
+      "package": "com.stephen.groove",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "backgroundColor": "#101011",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundImage": "./assets/images/android-icon-background.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "plugins": [
+      "expo-router",
+      "expo-sqlite",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#101011",
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 96
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#7aa7ff"
+        }
+      ],
+      "./plugins/with-release-signing",
+      "expo-font"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
