@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
+import { Bubble } from '@/components/ui/Bubble';
 import { Card } from '@/components/ui/Card';
 import { LineChart } from '@/components/ui/LineChart';
 import { Screen } from '@/components/ui/Screen';
@@ -18,7 +19,7 @@ import {
   rollingAverage,
   statsFor,
 } from '@/lib/stats';
-import { colors, depth, gradients, MIN_TOUCH_TARGET, radius, spacing } from '@/lib/theme';
+import { colors, MIN_TOUCH_TARGET, radius, spacing } from '@/lib/theme';
 
 type PeriodKey = 'week' | 'month' | 'quarter';
 
@@ -119,9 +120,9 @@ export default function AnalyticsScreen() {
                   : `across ${stats.length} habit${stats.length === 1 ? '' : 's'}`}
               </Text>
             </View>
-            <View style={styles.gradeBadge}>
+            <Bubble accent size={64}>
               <Text style={styles.gradeLetter}>{grade.letter}</Text>
-            </View>
+            </Bubble>
           </View>
 
           <View style={styles.chart}>
@@ -225,16 +226,6 @@ const styles = StyleSheet.create({
   gradeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   gradeLabels: { gap: 2 },
   gradePct: { fontSize: 40, fontWeight: '700', color: colors.fg, fontVariant: ['tabular-nums'] },
-  gradeBadge: {
-    width: 64,
-    height: 64,
-    borderRadius: radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.accent,
-    experimental_backgroundImage: gradients.accent,
-    boxShadow: depth.raisedSoft,
-  },
   gradeLetter: { fontSize: 30, fontWeight: '700', color: colors.onAccent },
   chart: { marginTop: spacing.md },
   habitRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },

@@ -4,7 +4,7 @@ import { HabitFace } from '@/components/pages/habit/HabitFace';
 import { Bubble } from '@/components/ui/Bubble';
 import { Card } from '@/components/ui/Card';
 import { Text } from '@/components/ui/Text';
-import { colors, depth, gradients, radius, spacing } from '@/lib/theme';
+import { colors, depth, radius, spacing } from '@/lib/theme';
 
 // One habit on one day, in three states: done, skipped, or neither.
 //
@@ -122,11 +122,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  checkboxOn: {
-    backgroundColor: colors.accent,
-    experimental_backgroundImage: gradients.accent,
-    boxShadow: depth.raisedSoft,
-  },
+  checkboxOn: { backgroundColor: colors.accent, boxShadow: depth.raisedSoft },
   // Sunken and bordered: the well says "put something here", and the hairline
   // carries the same message at a contrast the shadow alone cannot promise.
   checkboxOff: {

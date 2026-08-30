@@ -1,5 +1,6 @@
 import { StyleSheet, View, type ViewStyle } from 'react-native';
-import { BUBBLE, colors, depth, gradients, radius } from '@/lib/theme';
+import { Surface } from '@/components/ui/Surface';
+import { BUBBLE, colors, depth, radius } from '@/lib/theme';
 
 interface BubbleProps {
   children: React.ReactNode;
@@ -19,34 +20,26 @@ interface BubbleProps {
  * rows themselves are otherwise identical.
  */
 export function Bubble({ children, sunken = false, accent = false, size = BUBBLE, style }: BubbleProps) {
+  const shape = { width: size, height: size, borderRadius: radius.full };
+
+  if (sunken) {
+    return <View style={[styles.bubble, shape, styles.sunken, style]}>{children}</View>;
+  }
   return (
-    <View
-      style={[
-        styles.bubble,
-        { width: size, height: size, borderRadius: radius.full },
-        sunken ? styles.sunken : styles.raised,
-        accent ? styles.accent : null,
-        style,
-      ]}
+    <Surface
+      ramp={accent ? 'accent' : 'surface'}
+      style={[styles.bubble, shape, styles.raised, style ?? {}]}
     >
       {children}
-    </View>
+    </Surface>
   );
 }
 
 const styles = StyleSheet.create({
   bubble: {
-    backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  raised: { boxShadow: depth.raisedSoft, experimental_backgroundImage: gradients.surface },
+  raised: { boxShadow: depth.raisedSoft },
   sunken: { backgroundColor: colors.bgAlt, boxShadow: depth.sunken },
-  // Keeps the lift shadow so a filled bubble still reads as a physical object
-  // rather than a flat sticker.
-  accent: {
-    backgroundColor: colors.accent,
-    boxShadow: depth.raisedSoft,
-    experimental_backgroundImage: gradients.accent,
-  },
 });

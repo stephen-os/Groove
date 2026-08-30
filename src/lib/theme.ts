@@ -1,4 +1,4 @@
-import type { BackgroundImageValue, BoxShadowValue } from 'react-native';
+import type { BoxShadowValue } from 'react-native';
 
 // The single source of colour, depth and spacing. Nothing else defines a hex
 // value, a shadow or a magic pixel number.
@@ -102,7 +102,7 @@ export const colors: Colors = {
 };
 
 /**
- * The light falling across the app, as CSS gradients.
+ * The light falling across the app, as colour ramps for `expo-linear-gradient`.
  *
  * One source, high and to the right: every surface is lit at its top-right
  * corner and shaded at its bottom-left, and the paired shadows in `depth` throw
@@ -115,40 +115,23 @@ export const colors: Colors = {
  * looks like tiles. The shadows do the work of separating surfaces; these only
  * stop them looking flat.
  *
- * `experimental_backgroundImage` is React Native's own CSS-gradient support —
- * no dependency and no native build. The prefix is the API's, not a comment on
- * how settled it is; the alternative is a native module for four colour stops.
+ * These are values for a real native component rather than React Native's
+ * `experimental_backgroundImage` style. That style crashes the app outright —
+ * `BackgroundImageDrawable.draw` throws during a draw pass when a view carrying
+ * one is re-rendered rapidly, which tapping through a calendar does. A native
+ * module is a cheap price for not crashing.
  */
-export const gradients: Record<'page' | 'surface' | 'accent', BackgroundImageValue[]> = {
-  page: [
-    {
-      type: 'linear-gradient',
-      direction: 'to bottom left',
-      // Three stops rather than two: an eight-bit ramp across a whole screen
-      // bands into visible stripes, and a midpoint shortens each run enough to
-      // hide it.
-      colorStops: [
-        { color: slate.pageLight },
-        { color: slate.page },
-        { color: slate.pageDark },
-      ],
-    },
-  ],
-  surface: [
-    {
-      type: 'linear-gradient',
-      direction: 'to bottom left',
-      colorStops: [{ color: slate.surfaceLight }, { color: slate.surfaceDark }],
-    },
-  ],
-  accent: [
-    {
-      type: 'linear-gradient',
-      direction: 'to bottom left',
-      colorStops: [{ color: hue.emberLight }, { color: hue.emberDark }],
-    },
-  ],
+export const gradients = {
+  // Three stops rather than two across a whole screen: an eight-bit ramp bands
+  // into visible stripes, and a midpoint shortens each run enough to hide it.
+  page: [slate.pageLight, slate.page, slate.pageDark] as const,
+  surface: [slate.surfaceLight, slate.surfaceDark] as const,
+  accent: [hue.emberLight, hue.emberDark] as const,
 };
+
+/** Top-right to bottom-left, matching the direction `depth` throws its shadows. */
+export const GRADIENT_START = { x: 1, y: 0 } as const;
+export const GRADIENT_END = { x: 0, y: 1 } as const;
 
 /**
  * Depth, as paired shadows.

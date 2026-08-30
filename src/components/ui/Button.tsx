@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
+import { Surface } from '@/components/ui/Surface';
 import { Text } from '@/components/ui/Text';
-import { colors, depth, gradients, MIN_TOUCH_TARGET, radius, spacing } from '@/lib/theme';
+import { colors, depth, MIN_TOUCH_TARGET, radius, spacing } from '@/lib/theme';
 
 interface ButtonProps {
   label: string;
@@ -54,11 +55,6 @@ export function Button({
       accessibilityHint={accessibilityHint}
       style={({ pressed }) => [
         styles.base,
-        { backgroundColor },
-        // Only the filled tones carry the light; an outlined button is a hole
-        // in the page, not an object sitting on it.
-        tone === 'primary' ? styles.primaryLight : null,
-        tone === 'secondary' ? styles.secondaryLight : null,
         pressed ? styles.pressed : styles.raised,
         disabled ? styles.disabled : null,
         style,
@@ -66,11 +62,13 @@ export function Button({
     >
       {/* The label is centred in a full-height row so the touch target stays
           48dp even when the text itself is short. */}
-      <View style={styles.content}>
-        <Text variant="body" style={{ color, fontWeight: '700' }}>
-          {label}
-        </Text>
-      </View>
+      <Surface ramp={tone === 'primary' ? 'accent' : 'surface'} style={[styles.fill, { backgroundColor }]}>
+        <View style={styles.content}>
+          <Text variant="body" style={{ color, fontWeight: '700' }}>
+            {label}
+          </Text>
+        </View>
+      </Surface>
     </Pressable>
   );
 }
@@ -79,13 +77,19 @@ const styles = StyleSheet.create({
   base: {
     minHeight: MIN_TOUCH_TARGET,
     borderRadius: radius.md,
-    paddingHorizontal: spacing.lg,
     justifyContent: 'center',
   },
   raised: { boxShadow: depth.raised },
-  primaryLight: { experimental_backgroundImage: gradients.accent },
-  secondaryLight: { experimental_backgroundImage: gradients.surface },
   pressed: { boxShadow: depth.sunken },
+  // The gradient lives on an inner view so the outer one can own the shadow —
+  // a shadow and a clipped fill cannot share a node.
+  fill: {
+    flex: 1,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.lg,
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
   disabled: { opacity: 0.45 },
   content: {
     flexDirection: 'row',

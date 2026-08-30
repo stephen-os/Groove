@@ -1,9 +1,16 @@
-import { StyleSheet, View, type ViewStyle } from 'react-native';
+import { StyleSheet, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, gradients, spacing } from '@/lib/theme';
+import { Surface } from '@/components/ui/Surface';
+import { spacing } from '@/lib/theme';
 
-/** The gutter every screen keeps between its content and the display edge. */
-const GUTTER = spacing.md;
+/**
+ * The gutter every screen keeps between its content and the display edge.
+ *
+ * Wide enough to clear the shadows: `depth.raised` throws five pixels out with
+ * a twelve-pixel blur, so anything less than that leaves every card's highlight
+ * sliced off against the side of the screen.
+ */
+const GUTTER = spacing.lg;
 
 interface ScreenProps {
   children: React.ReactNode;
@@ -28,7 +35,8 @@ export function Screen({ children, edgeToEdgeBottom = false, style }: ScreenProp
   const insets = useSafeAreaInsets();
 
   return (
-    <View
+    <Surface
+      ramp="page"
       style={[
         styles.root,
         {
@@ -45,14 +53,12 @@ export function Screen({ children, edgeToEdgeBottom = false, style }: ScreenProp
       ]}
     >
       {children}
-    </View>
+    </Surface>
   );
 }
 
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: colors.bg,
-    experimental_backgroundImage: gradients.page,
   },
 });

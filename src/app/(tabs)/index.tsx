@@ -1,11 +1,12 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Alert, SectionList, StyleSheet, View } from 'react-native';
+import { Alert, Pressable, SectionList, StyleSheet, View } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { HabitCheckRow } from '@/components/pages/habit/HabitCheckRow';
 import { Button } from '@/components/ui/Button';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
-import { formatTime, fromDayKey, todayKey } from '@/lib/date';
+import { addDays, formatTime, fromDayKey, todayKey } from '@/lib/date';
 import { habitColor, habitIcon } from '@/lib/habit-style';
 import {
   completionsBetween,
@@ -26,7 +27,7 @@ import {
   paceLabel,
   weekRange,
 } from '@/lib/schedule';
-import { colors, spacing } from '@/lib/theme';
+import { colors, MIN_TOUCH_TARGET, spacing } from '@/lib/theme';
 
 interface Row {
   readonly habit: Habit;
@@ -42,7 +43,12 @@ export default function TodayScreen() {
   const [completions, setCompletions] = useState<Completion[]>([]);
   const [loaded, setLoaded] = useState(false);
 
-  const day = todayKey();
+  const today = todayKey();
+  // The day being looked at. Only today can be changed; the rest is a read-only
+  // look forward or back, so the screen answers "what does Thursday hold" as
+  // well as "what is left now".
+  const [day, setDay] = useState(today);
+  const readOnly = day !== today;
 
   // Weekly and monthly habits count completions across their whole period, and
   // a week can straddle a month boundary — so load the union of both ranges
@@ -152,13 +158,52 @@ export default function TodayScreen() {
         contentContainerStyle={styles.list}
         stickySectionHeadersEnabled={false}
         ListHeaderComponent={
-          <Text variant="caption" tone="muted" style={styles.date}>
-            {fromDayKey(day).toLocaleDateString(undefined, {
-              weekday: 'long',
-              day: 'numeric',
-              month: 'long',
-            })}
-          </Text>
+          <View style={styles.dateBar}>
+            <Pressable
+              onPress={() => setDay(addDays(day, -1))}
+              accessibilityRole="button"
+              accessibilityLabel="Previous day"
+              style={styles.arrow}
+            >
+              <Ionicons name="chevron-back" size={22} color={colors.accent} />
+            </Pressable>
+
+            <Pressable
+              onPress={() => setDay(today)}
+              disabled={!readOnly}
+              accessibilityRole="button"
+              accessibilityLabel={
+                readOnly
+                  ? `${fromDayKey(day).toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}. Back to today`
+                  : fromDayKey(day).toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })
+              }
+              style={styles.dateLabel}
+            >
+              <Text variant="heading">
+                {readOnly
+                  ? fromDayKey(day).toLocaleDateString(undefined, {
+                      weekday: 'long',
+                      day: 'numeric',
+                      month: 'long',
+                    })
+                  : 'Today'}
+              </Text>
+              {readOnly && (
+                <Text variant="caption" tone="accent">
+                  Tap to return to today
+                </Text>
+              )}
+            </Pressable>
+
+            <Pressable
+              onPress={() => setDay(addDays(day, 1))}
+              accessibilityRole="button"
+              accessibilityLabel="Next day"
+              style={styles.arrow}
+            >
+              <Ionicons name="chevron-forward" size={22} color={colors.accent} />
+            </Pressable>
+          </View>
         }
         renderSectionHeader={({ section }) => (
           // A hairline rule carries the eye across to the time, so a block of
@@ -174,12 +219,14 @@ export default function TodayScreen() {
           nothingDue ? (
             <View style={styles.empty}>
               <Text variant="heading">
-                {habits.length === 0 ? 'No habits yet' : 'Nothing due today'}
+                {habits.length === 0 ? 'No habits yet' : 'Nothing scheduled'}
               </Text>
               <Text tone="muted">
                 {habits.length === 0
                   ? 'Add the first one to start tracking.'
-                  : 'Enjoy the day off.'}
+                  : readOnly
+                    ? 'Nothing was due that day.'
+                    : 'Enjoy the day off.'}
               </Text>
             </View>
           ) : null
@@ -193,6 +240,7 @@ export default function TodayScreen() {
             done={item.done}
             skipped={item.skipped}
             pace={item.pace}
+            disabled={readOnly}
             onToggle={() => mark(item.habit, item.done ? null : 'done')}
             onSkip={() => mark(item.habit, item.skipped ? null : 'skipped')}
           />
@@ -210,7 +258,19 @@ export default function TodayScreen() {
 
 const styles = StyleSheet.create({
   list: { gap: spacing.sm, paddingVertical: spacing.md },
-  date: { marginBottom: spacing.sm },
+  dateBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.sm,
+  },
+  dateLabel: { flex: 1, alignItems: 'center' },
+  arrow: {
+    width: MIN_TOUCH_TARGET,
+    height: MIN_TOUCH_TARGET,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
