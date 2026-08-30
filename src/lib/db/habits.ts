@@ -140,6 +140,8 @@ export async function getHabit(id: number): Promise<Habit | null> {
 /** The fields a habit's form owns. Everything else is bookkeeping. */
 export interface HabitInput {
   name: string;
+  icon: string;
+  color: string;
   scheduleKind: ScheduleKind;
   weekdayMask: number;
   targetCount: number;
@@ -156,14 +158,16 @@ export async function createHabit(profileId: number, input: HabitInput): Promise
 
   const result = await db.runAsync(
     `INSERT INTO habits (
-       profile_id, name, schedule_kind, weekday_mask, target_count,
+       profile_id, name, icon, color, schedule_kind, weekday_mask, target_count,
        due_time, remind_enabled, follow_ups, target_pct, starts_on,
        created_at, updated_at
      )
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       profileId,
       input.name,
+      input.icon,
+      input.color,
       input.scheduleKind,
       input.weekdayMask,
       input.targetCount,
@@ -193,11 +197,14 @@ export async function updateHabit(id: number, input: HabitInput): Promise<void> 
   const db = await getDatabase();
   await db.runAsync(
     `UPDATE habits SET
-       name = ?, schedule_kind = ?, weekday_mask = ?, target_count = ?,
-       due_time = ?, remind_enabled = ?, follow_ups = ?, target_pct = ?, updated_at = ?
+       name = ?, icon = ?, color = ?, schedule_kind = ?, weekday_mask = ?,
+       target_count = ?, due_time = ?, remind_enabled = ?, follow_ups = ?,
+       target_pct = ?, updated_at = ?
      WHERE id = ?`,
     [
       input.name,
+      input.icon,
+      input.color,
       input.scheduleKind,
       input.weekdayMask,
       input.targetCount,

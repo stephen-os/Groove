@@ -1,7 +1,7 @@
 import { useId } from 'react';
 import { StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
 import { Text } from '@/components/ui/Text';
-import { colors, MIN_TOUCH_TARGET, radius, spacing } from '@/lib/theme';
+import { colors, depth, MIN_TOUCH_TARGET, radius, spacing } from '@/lib/theme';
 
 interface TextFieldProps extends Omit<TextInputProps, 'style'> {
   label: string;
@@ -10,15 +10,15 @@ interface TextFieldProps extends Omit<TextInputProps, 'style'> {
 }
 
 /**
- * Labelled text input.
+ * Labelled text input, pressed into the page.
  *
  * React Native has no `htmlFor`, so the visible label is wired to the input with
  * `accessibilityLabelledBy` / `nativeID` — without it TalkBack reads the field
  * as an unlabelled edit box and the visible label as unrelated text.
  *
- * The border uses `borderStrong`, not `border`: this is a control boundary, and
- * WCAG 1.4.11 wants 3:1 for those. The decorative `border` token is deliberately
- * below that (see theme.ts).
+ * The inset shadow is what says "type here", but it is decoration: a hairline
+ * of `borderStrong` carries the same message at the 3:1 WCAG 1.4.11 asks of a
+ * control boundary, for anyone who cannot see the soft gradient.
  */
 export function TextField({ label, error, multiline, ...rest }: TextFieldProps) {
   const labelId = useId();
@@ -65,13 +65,15 @@ const styles = StyleSheet.create({
     borderColor: colors.borderStrong,
     color: colors.fg,
     borderRadius: radius.sm,
-    borderWidth: 1,
-    paddingHorizontal: spacing.sm,
+    borderWidth: StyleSheet.hairlineWidth,
+    boxShadow: depth.sunken,
+    paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     fontSize: 16,
   },
   inputError: {
     borderColor: colors.error,
+    borderWidth: 1,
   },
   multiline: {
     minHeight: MIN_TOUCH_TARGET * 2,

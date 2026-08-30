@@ -1,23 +1,31 @@
 import { StyleSheet, View, type ViewStyle } from 'react-native';
-import { colors, radius, spacing } from '@/lib/theme';
+import { colors, depth, radius, spacing } from '@/lib/theme';
 
 interface CardProps {
   children: React.ReactNode;
+  /** Presses the card into the page instead of lifting it out. */
+  sunken?: boolean;
   style?: ViewStyle;
 }
 
-// Raised surface panel — the one definition of what a grouped block looks like.
-export function Card({ children, style }: CardProps) {
-  return <View style={[styles.card, style]}>{children}</View>;
+/**
+ * A raised surface — the one definition of what a grouped block looks like.
+ *
+ * The fill is the same colour as the page. What separates it is the paired
+ * shadow: light from the top-left, shade from the bottom-right. Give it a
+ * different fill and the soft-UI illusion breaks immediately.
+ */
+export function Card({ children, sunken = false, style }: CardProps) {
+  return <View style={[styles.card, sunken ? styles.sunken : styles.raised, style]}>{children}</View>;
 }
 
 const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: radius.lg,
     padding: spacing.md,
     gap: spacing.xs,
   },
+  raised: { boxShadow: depth.raised },
+  sunken: { backgroundColor: colors.bgAlt, boxShadow: depth.sunken },
 });

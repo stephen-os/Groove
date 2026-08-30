@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { HABIT_COLORS } from '@/lib/habit-style';
 import { colors, MIN_TOUCH_TARGET } from '@/lib/theme';
 
 // WCAG 2.1 relative luminance and contrast ratio. Small enough to keep here
@@ -37,6 +38,7 @@ const textPairs: [string, string, string][] = [
   ['muted on bgAlt', colors.muted, colors.bgAlt],
   ['accent on bg', colors.accent, colors.bg],
   ['accent on surface', colors.accent, colors.surface],
+  ['accent on bgAlt', colors.accent, colors.bgAlt],
   // The filled-button case. Easy to get backwards: on a light accent the
   // readable label is dark, not the page colour.
   ['onAccent on accent', colors.onAccent, colors.accent],
@@ -67,6 +69,33 @@ describe('dark palette', () => {
     for (const [token, value] of Object.entries(colors)) {
       expect(value, token).toMatch(/^#[0-9a-f]{6}$/);
     }
+  });
+});
+
+// The habit tints colour an icon and a progress bar, never a paragraph, so the
+// bar is WCAG 1.4.11's 3:1 for non-text content rather than the 4.5:1 asked of
+// body copy.
+describe('habit tints', () => {
+  it.each(HABIT_COLORS.map((tint) => [tint] as const))(
+    '%s is legible as a graphic on the page',
+    (tint) => {
+      expect(contrast(tint, colors.bg)).toBeGreaterThanOrEqual(AA_UI);
+    }
+  );
+
+  it.each(HABIT_COLORS.map((tint) => [tint] as const))(
+    '%s is legible on a recessed surface too',
+    (tint) => {
+      expect(contrast(tint, colors.bgAlt)).toBeGreaterThanOrEqual(AA_UI);
+    }
+  );
+
+  it('uses six-digit hex throughout, which the contrast maths assumes', () => {
+    for (const tint of HABIT_COLORS) expect(tint).toMatch(/^#[0-9a-f]{6}$/);
+  });
+
+  it('offers distinct choices', () => {
+    expect(new Set(HABIT_COLORS).size).toBe(HABIT_COLORS.length);
   });
 });
 

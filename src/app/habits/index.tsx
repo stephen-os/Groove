@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { Alert, Pressable, SectionList, StyleSheet, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { Bubble } from '@/components/ui/Bubble';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Screen } from '@/components/ui/Screen';
@@ -14,6 +15,7 @@ import {
   restoreHabit,
   type Habit,
 } from '@/lib/db/habits';
+import { habitColor, habitIcon } from '@/lib/habit-style';
 import { getActiveProfileId } from '@/lib/db/profiles';
 import { syncReminders } from '@/lib/reminders';
 import { describeSchedule, groupByDueTime } from '@/lib/schedule';
@@ -125,6 +127,13 @@ export default function ManageHabitsScreen() {
                 disabled={isArchived}
                 style={styles.row}
               >
+                <Bubble size={40}>
+                  <Ionicons
+                    name={habitIcon(item.icon) as never}
+                    size={18}
+                    color={habitColor(item.color)}
+                  />
+                </Bubble>
                 <View style={styles.labels}>
                   <Text variant="heading">{item.name}</Text>
                   <Text variant="caption" tone="muted">

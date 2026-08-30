@@ -11,7 +11,7 @@
       "package": "com.stephen.groove",
       "versionCode": 1,
       "adaptiveIcon": {
-        "backgroundColor": "#101011",
+        "backgroundColor": "#2c2f35",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -24,7 +24,7 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#101011",
+          "backgroundColor": "#2c2f35",
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 96
         }
@@ -32,7 +32,7 @@
       [
         "expo-notifications",
         {
-          "color": "#7aa7ff"
+          "color": "#ff8a3d"
         }
       ],
       "./plugins/with-release-signing",

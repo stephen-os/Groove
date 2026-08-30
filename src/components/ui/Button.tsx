@@ -1,12 +1,12 @@
 import { Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
 import { Text } from '@/components/ui/Text';
-import { colors, MIN_TOUCH_TARGET, radius, spacing } from '@/lib/theme';
+import { colors, depth, MIN_TOUCH_TARGET, radius, spacing } from '@/lib/theme';
 
 interface ButtonProps {
   label: string;
   onPress: () => void;
-  /** 'primary' fills with the accent; 'secondary' is outlined; 'danger' is destructive. */
-  tone?: keyof typeof TONES;
+  /** 'primary' fills with the accent; 'secondary' is bare; 'danger' is destructive. */
+  tone?: keyof typeof FILLS;
   disabled?: boolean;
   /**
    * Longer description for screen readers, when the label alone is ambiguous
@@ -16,20 +16,22 @@ interface ButtonProps {
   style?: ViewStyle;
 }
 
-// On a filled button the readable foreground is `onAccent`, not the page colour
-// — see theme.ts. Outlined buttons draw their label in normal text.
-const TONES = {
-  primary: { backgroundColor: colors.accent, borderColor: colors.accent, color: colors.onAccent },
-  secondary: { backgroundColor: 'transparent', borderColor: colors.borderStrong, color: colors.fg },
-  danger: { backgroundColor: colors.error, borderColor: colors.error, color: colors.onAccent },
+const FILLS = {
+  primary: { backgroundColor: colors.accent, color: colors.onAccent },
+  secondary: { backgroundColor: colors.surface, color: colors.fg },
+  danger: { backgroundColor: colors.error, color: colors.onAccent },
 } as const;
 
 /**
  * The app's only button.
  *
  * Everything tappable goes through here so three things can't be forgotten:
- * the 48dp minimum hit area, the disabled state being announced rather than just
- * greyed out, and a pressed state that is visible without relying on colour.
+ * the 48dp minimum hit area, the disabled state being announced rather than
+ * just dimmed, and a pressed state that is visible without relying on colour.
+ *
+ * Pressing swaps the raised shadow for an inset one, so the button physically
+ * sinks into the page. That reads as a press even to someone who cannot
+ * distinguish the fill from its surroundings.
  */
 export function Button({
   label,
@@ -39,7 +41,7 @@ export function Button({
   accessibilityHint,
   style,
 }: ButtonProps) {
-  const { color, ...surface } = TONES[tone];
+  const { color, backgroundColor } = FILLS[tone];
 
   return (
     <Pressable
@@ -52,15 +54,16 @@ export function Button({
       accessibilityHint={accessibilityHint}
       style={({ pressed }) => [
         styles.base,
-        surface,
-        { opacity: disabled ? 0.5 : pressed ? 0.85 : 1 },
+        { backgroundColor },
+        pressed ? styles.pressed : styles.raised,
+        disabled ? styles.disabled : null,
         style,
       ]}
     >
       {/* The label is centred in a full-height row so the touch target stays
           48dp even when the text itself is short. */}
       <View style={styles.content}>
-        <Text variant="body" style={{ color, fontWeight: '600' }}>
+        <Text variant="body" style={{ color, fontWeight: '700' }}>
           {label}
         </Text>
       </View>
@@ -72,10 +75,12 @@ const styles = StyleSheet.create({
   base: {
     minHeight: MIN_TOUCH_TARGET,
     borderRadius: radius.md,
-    borderWidth: 1,
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.lg,
     justifyContent: 'center',
   },
+  raised: { boxShadow: depth.raised },
+  pressed: { boxShadow: depth.sunken },
+  disabled: { opacity: 0.45 },
   content: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { formatTime, fromDayKey, todayKey } from '@/lib/date';
+import { habitColor, habitIcon } from '@/lib/habit-style';
 import {
   completionsBetween,
   setStatus,
@@ -25,7 +26,7 @@ import {
   paceLabel,
   weekRange,
 } from '@/lib/schedule';
-import { spacing } from '@/lib/theme';
+import { colors, spacing } from '@/lib/theme';
 
 interface Row {
   readonly habit: Habit;
@@ -160,9 +161,14 @@ export default function TodayScreen() {
           </Text>
         }
         renderSectionHeader={({ section }) => (
-          <Text variant="caption" tone="muted" style={styles.section}>
-            {section.title.toUpperCase()}
-          </Text>
+          // A hairline rule carries the eye across to the time, so a block of
+          // habits reads as belonging to it rather than merely following it.
+          <View style={styles.sectionHeader}>
+            <Text variant="caption" tone="muted" style={styles.section}>
+              {section.title.toUpperCase()}
+            </Text>
+            <View style={styles.rule} />
+          </View>
         )}
         ListEmptyComponent={
           nothingDue ? (
@@ -182,6 +188,8 @@ export default function TodayScreen() {
           <HabitCheckRow
             name={item.habit.name}
             schedule={describeSchedule(item.habit)}
+            icon={habitIcon(item.habit.icon)}
+            tint={habitColor(item.habit.color)}
             done={item.done}
             skipped={item.skipped}
             pace={item.pace}
@@ -203,7 +211,15 @@ export default function TodayScreen() {
 const styles = StyleSheet.create({
   list: { gap: spacing.sm, paddingVertical: spacing.md },
   date: { marginBottom: spacing.sm },
-  section: { marginTop: spacing.sm, letterSpacing: 1 },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+    marginBottom: spacing.xs,
+  },
+  section: { letterSpacing: 1.5 },
+  rule: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
   empty: { alignItems: 'center', gap: spacing.xs, paddingVertical: spacing.xl },
   newButton: { marginBottom: spacing.md },
 });

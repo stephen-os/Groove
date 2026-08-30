@@ -1,11 +1,14 @@
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { Button } from '@/components/ui/Button';
 import { Text } from '@/components/ui/Text';
 import { TextField } from '@/components/ui/TextField';
+import { Bubble } from '@/components/ui/Bubble';
 import { EVERY_DAY, WEEKDAYS } from '@/lib/date';
+import { DEFAULT_ICON, HABIT_COLORS, HABIT_ICONS } from '@/lib/habit-style';
 import type { HabitInput, ScheduleKind } from '@/lib/db/habits';
-import { colors, MIN_TOUCH_TARGET, radius, spacing } from '@/lib/theme';
+import { colors, depth, MIN_TOUCH_TARGET, radius, spacing } from '@/lib/theme';
 
 // Shared by the create and edit screens. Everything a habit's form owns lives
 // here so the two screens differ only in what they do with the result.
@@ -38,6 +41,8 @@ const NAGS: readonly { readonly count: number; readonly label: string }[] = [
 
 export const EMPTY_HABIT: HabitInput = {
   name: '',
+  icon: DEFAULT_ICON,
+  color: HABIT_COLORS[0],
   scheduleKind: 'daily',
   weekdayMask: EVERY_DAY,
   targetCount: 3,
@@ -61,6 +66,8 @@ interface HabitFormProps {
 
 export function HabitForm({ initial, submitLabel, onSubmit }: HabitFormProps) {
   const [name, setName] = useState(initial.name);
+  const [icon, setIcon] = useState(initial.icon);
+  const [color, setColor] = useState(initial.color);
   const [kind, setKind] = useState<ScheduleKind>(initial.scheduleKind);
   const [weekdayMask, setWeekdayMask] = useState(initial.weekdayMask);
   const [targetCount, setTargetCount] = useState(initial.targetCount);
@@ -100,6 +107,8 @@ export function HabitForm({ initial, submitLabel, onSubmit }: HabitFormProps) {
     setSaving(true);
     onSubmit({
       name: trimmedName,
+      icon,
+      color,
       scheduleKind: kind,
       weekdayMask,
       // A daily habit is scheduled by its mask, so a count would be a second
@@ -128,6 +137,59 @@ export function HabitForm({ initial, submitLabel, onSubmit }: HabitFormProps) {
         autoFocus={initial.name.length === 0}
         returnKeyType="done"
       />
+
+      <View style={styles.group}>
+        <Text variant="caption" tone="muted">
+          Icon
+        </Text>
+        <View style={styles.chips}>
+          {HABIT_ICONS.map((option) => {
+            const selected = icon === option;
+            return (
+              <Pressable
+                key={option}
+                onPress={() => setIcon(option)}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: selected }}
+                accessibilityLabel={option.replace(/-outline$/, '').replace(/-/g, ' ')}
+              >
+                <Bubble accent={selected} size={44}>
+                  <Ionicons
+                    name={option as never}
+                    size={20}
+                    color={selected ? colors.onAccent : color}
+                  />
+                </Bubble>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+
+      <View style={styles.group}>
+        <Text variant="caption" tone="muted">
+          Colour
+        </Text>
+        <View style={styles.chips}>
+          {HABIT_COLORS.map((option) => {
+            const selected = color === option;
+            return (
+              <Pressable
+                key={option}
+                onPress={() => setColor(option)}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: selected }}
+                accessibilityLabel={`Colour ${HABIT_COLORS.indexOf(option) + 1}`}
+                style={[styles.swatch, { backgroundColor: option }]}
+              >
+                {/* A tick rather than a ring, so the choice survives being seen
+                    by someone who cannot separate these hues from each other. */}
+                {selected && <Ionicons name="checkmark" size={20} color={colors.onAccent} />}
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
 
       <View style={styles.group} accessibilityRole="radiogroup">
         <Text variant="caption" tone="muted">
@@ -299,6 +361,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  swatch: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    boxShadow: depth.raisedSoft,
   },
   chipOn: { backgroundColor: colors.accent, borderColor: colors.accent },
   chipOff: { backgroundColor: 'transparent', borderColor: colors.borderStrong },

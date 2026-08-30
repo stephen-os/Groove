@@ -64,6 +64,8 @@ export default function EditHabitScreen() {
       <HabitForm
         initial={{
           name: habit.name,
+          icon: habit.icon,
+          color: habit.color,
           scheduleKind: habit.scheduleKind,
           weekdayMask: habit.weekdayMask,
           targetCount: habit.targetCount,

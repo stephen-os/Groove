@@ -6,6 +6,7 @@ import { HabitCheckRow } from '@/components/pages/habit/HabitCheckRow';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { addDays, formatTime, fromDayKey, toDayKey, todayKey, WEEKDAYS } from '@/lib/date';
+import { habitColor, habitIcon } from '@/lib/habit-style';
 import {
   completionsBetween,
   setStatus,
@@ -249,14 +250,19 @@ export default function HistoryScreen() {
         ) : (
           groups.map((group) => (
             <View key={group.dueTime ?? 'anytime'} style={styles.group}>
-              <Text variant="caption" tone="muted" style={styles.groupLabel}>
-                {(group.dueTime === null ? 'Anytime' : formatTime(group.dueTime)).toUpperCase()}
-              </Text>
+              <View style={styles.groupHeader}>
+                <Text variant="caption" tone="muted" style={styles.groupLabel}>
+                  {(group.dueTime === null ? 'Anytime' : formatTime(group.dueTime)).toUpperCase()}
+                </Text>
+                <View style={styles.rule} />
+              </View>
               {group.data.map((row) => (
                 <HabitCheckRow
                   key={row.habit.id}
                   name={row.habit.name}
                   schedule={describeSchedule(row.habit)}
+                  icon={habitIcon(row.habit.icon)}
+                  tint={habitColor(row.habit.color)}
                   done={row.done}
                   skipped={row.skipped}
                   pace={row.pace}
@@ -298,5 +304,7 @@ const styles = StyleSheet.create({
   barFill: { height: 3, borderRadius: 2 },
   selectedLabel: { marginTop: spacing.md, letterSpacing: 1 },
   group: { gap: spacing.sm },
-  groupLabel: { marginTop: spacing.xs, letterSpacing: 1 },
+  groupHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.xs },
+  groupLabel: { letterSpacing: 1.5 },
+  rule: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
 });
