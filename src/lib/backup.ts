@@ -54,6 +54,7 @@ const HabitSchema = z.strictObject({
     .regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Expected a HH:MM time.')
     .nullable(),
   remindEnabled: z.boolean(),
+  followUps: z.number().int().min(0).max(3),
   targetPct: z.number().int().min(0).max(100),
   startsOn: dayKey,
   archivedAt: timestamp.nullable(),
@@ -65,6 +66,7 @@ const CompletionSchema = z.strictObject({
   id,
   habitId: id,
   day: dayKey,
+  status: z.enum(['done', 'skipped']),
   doneAt: timestamp,
 });
 
@@ -125,7 +127,7 @@ function referentialError(backup: Backup): string | null {
   const seen = new Set<string>();
   for (const completion of backup.completions) {
     const key = `${completion.habitId}:${completion.day}`;
-    if (seen.has(key)) return 'That backup marks the same habit complete twice on one day.';
+    if (seen.has(key)) return 'That backup records the same habit twice on one day.';
     seen.add(key);
   }
 

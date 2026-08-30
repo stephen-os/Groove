@@ -27,6 +27,7 @@ const data: GrooveData = {
       targetCount: 1,
       dueTime: '07:00',
       remindEnabled: true,
+      followUps: 3,
       targetPct: 90,
       startsOn: '2026-08-01',
       archivedAt: null,
@@ -45,6 +46,7 @@ const data: GrooveData = {
       targetCount: 3,
       dueTime: null,
       remindEnabled: false,
+      followUps: 0,
       targetPct: 80,
       startsOn: '2026-08-01',
       archivedAt: null,
@@ -53,9 +55,9 @@ const data: GrooveData = {
     },
   ],
   completions: [
-    { id: 1, habitId: 1, day: '2026-08-29', doneAt: 1_700_000_100_000 },
-    { id: 2, habitId: 1, day: '2026-08-30', doneAt: 1_700_000_200_000 },
-    { id: 3, habitId: 2, day: '2026-08-30', doneAt: 1_700_000_300_000 },
+    { id: 1, habitId: 1, day: '2026-08-29', status: 'done', doneAt: 1_700_000_100_000 },
+    { id: 2, habitId: 1, day: '2026-08-30', status: 'skipped', doneAt: 1_700_000_200_000 },
+    { id: 3, habitId: 2, day: '2026-08-30', status: 'done', doneAt: 1_700_000_300_000 },
   ],
 };
 
@@ -161,7 +163,7 @@ describe('parseBackup referential integrity', () => {
       habitId: 1,
       day: '2026-08-30',
     };
-    expectRejected(backup, 'complete twice on one day');
+    expectRejected(backup, 'twice on one day');
   });
 
   it('rejects duplicate profile ids', () => {

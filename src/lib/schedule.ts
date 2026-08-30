@@ -1,5 +1,5 @@
-import { fromDayKey, maskIncludes, toDayKey, WEEKDAYS, type DayKey } from './date';
-import type { Completion } from './db/completions';
+import { addDays, fromDayKey, maskIncludes, toDayKey, WEEKDAYS, type DayKey } from './date';
+import type { Completion, CompletionStatus } from './db/completions';
 import type { Habit } from './db/habits';
 
 // Which habits are due on a given day, and how far through their period the
@@ -10,14 +10,15 @@ import type { Habit } from './db/habits';
 // question. Keeping it pure — no database, no clock it isn't handed — is what
 // lets the awkward cases be tested in plain Node rather than found on a phone.
 
-/** Completions arranged for lookup: habit id to the days it was done. */
-export type CompletionIndex = ReadonlyMap<number, ReadonlySet<DayKey>>;
+/** What happened to a habit on each day: done, skipped, or absent for neither. */
+export type DayStatuses = ReadonlyMap<DayKey, CompletionStatus>;
+export type CompletionIndex = ReadonlyMap<number, DayStatuses>;
 
 export function indexCompletions(completions: readonly Completion[]): CompletionIndex {
-  const index = new Map<number, Set<DayKey>>();
+  const index = new Map<number, Map<DayKey, CompletionStatus>>();
   for (const completion of completions) {
-    const days = index.get(completion.habitId) ?? new Set<DayKey>();
-    days.add(completion.day);
+    const days = index.get(completion.habitId) ?? new Map<DayKey, CompletionStatus>();
+    days.set(completion.day, completion.status);
     index.set(completion.habitId, days);
   }
   return index;
@@ -54,6 +55,18 @@ export function monthRange(day: DayKey): DayRange {
   return { from: toDayKey(start), to: toDayKey(end) };
 }
 
+/** The period a flexible habit is measured over. */
+export function periodOf(habit: Habit, day: DayKey): DayRange {
+  return habit.scheduleKind === 'weekly' ? weekRange(day) : monthRange(day);
+}
+
+/** Days in a range, inclusive at both ends. */
+function daysInRange(range: DayRange): number {
+  let count = 0;
+  for (let day = range.from; day <= range.to; day = addDays(day, 1)) count += 1;
+  return count;
+}
+
 /** The day a habit was archived, or null while it is still active. */
 export function archivedOn(habit: Habit): DayKey | null {
   return habit.archivedAt === null ? null : toDayKey(new Date(habit.archivedAt));
@@ -72,26 +85,44 @@ export function isActiveOn(habit: Habit, day: DayKey): boolean {
   return archived === null || day < archived;
 }
 
-/** How many days in `range` the habit was completed. */
-export function countInRange(days: ReadonlySet<DayKey> | undefined, range: DayRange): number {
+/** How many days in `range` carry the given status. */
+export function countStatus(
+  days: DayStatuses | undefined,
+  range: DayRange,
+  status: CompletionStatus
+): number {
   if (!days) return 0;
   let count = 0;
-  for (const day of days) {
-    if (day >= range.from && day <= range.to) count += 1;
+  for (const [day, value] of days) {
+    if (value === status && day >= range.from && day <= range.to) count += 1;
   }
   return count;
+}
+
+/**
+ * A flexible habit's target for one period, after skipped days are taken off.
+ *
+ * Skipping is opting out of one of the sessions: a 3x-per-week habit with one
+ * day skipped needs two, not three. Floored at zero — skipping more days than
+ * the target does not put you in credit.
+ */
+export function effectiveTarget(habit: Habit, days: DayStatuses | undefined, period: DayRange): number {
+  return Math.max(0, habit.targetCount - countStatus(days, period, 'skipped'));
 }
 
 interface DailyEntry {
   readonly habit: Habit;
   readonly done: boolean;
+  readonly skipped: boolean;
 }
 
 interface PeriodEntry {
   readonly habit: Habit;
   readonly done: boolean;
+  readonly skipped: boolean;
   /** Completions so far inside the current week or month. */
   readonly count: number;
+  /** The target after skipped days are deducted. */
   readonly target: number;
 }
 
@@ -106,8 +137,8 @@ export interface DueToday {
  *
  * Daily habits appear when the weekday bitmask includes the day. Flexible ones
  * appear every day until their target is met, then step aside for the rest of
- * the period — except on a day they were actually ticked, where they stay
- * visible so the tick can be taken back.
+ * the period — except on a day they were actually acted on, where they stay
+ * visible so the tick or the skip can be taken back.
  */
 export function habitsDueOn(
   habits: readonly Habit[],
@@ -122,18 +153,21 @@ export function habitsDueOn(
     if (!isActiveOn(habit, day)) continue;
 
     const days = completions.get(habit.id);
-    const done = days?.has(day) ?? false;
+    const status = days?.get(day);
+    const done = status === 'done';
+    const skipped = status === 'skipped';
 
     if (habit.scheduleKind === 'daily') {
-      if (maskIncludes(habit.weekdayMask, day)) daily.push({ habit, done });
+      if (maskIncludes(habit.weekdayMask, day)) daily.push({ habit, done, skipped });
       continue;
     }
 
-    const range = habit.scheduleKind === 'weekly' ? weekRange(day) : monthRange(day);
-    const count = countInRange(days, range);
-    if (count >= habit.targetCount && !done) continue;
+    const period = periodOf(habit, day);
+    const count = countStatus(days, period, 'done');
+    const target = effectiveTarget(habit, days, period);
+    if (count >= target && !done && !skipped) continue;
 
-    const entry: PeriodEntry = { habit, done, count, target: habit.targetCount };
+    const entry: PeriodEntry = { habit, done, skipped, count, target };
     if (habit.scheduleKind === 'weekly') weekly.push(entry);
     else monthly.push(entry);
   }
@@ -144,6 +178,21 @@ export function habitsDueOn(
 /** Whether anything at all is due — cheaper than three length checks at the call site. */
 export function isEmpty(due: DueToday): boolean {
   return due.daily.length === 0 && due.weekly.length === 0 && due.monthly.length === 0;
+}
+
+/**
+ * How many completions a flexible habit ought to have by now in its period.
+ *
+ * Prorated by elapsed days and floored, so you are only behind once you have
+ * demonstrably fallen behind: 3x a week means nothing is expected on Monday or
+ * Tuesday, one by Wednesday, two by Friday. Rounding up instead would mark you
+ * behind on the first morning of every week.
+ */
+export function expectedByNow(target: number, period: DayRange, today: DayKey): number {
+  if (today >= period.to) return target;
+  if (today < period.from) return 0;
+  const elapsed = daysInRange({ from: period.from, to: today });
+  return Math.floor((target * elapsed) / daysInRange(period));
 }
 
 /** A one-line description of when a habit happens, for the UI. */
@@ -157,4 +206,24 @@ export function describeSchedule(habit: Habit): string {
   if (chosen.length === WEEKDAYS.length) return 'Every day';
   if (chosen.length === 0) return 'No days selected';
   return chosen.map((weekday) => weekday.label).join(' ');
+}
+
+/**
+ * How a flexible habit's week or month is going, in words.
+ *
+ * Deliberately generous about the present and honest about the past: while the
+ * period is still running it says what is left rather than what is missing, and
+ * only calls you behind once the prorated pace says so.
+ */
+export function paceLabel(entry: PeriodEntry, today: DayKey): string {
+  const remaining = Math.max(0, entry.target - entry.count);
+  if (remaining === 0) return 'Done for the period';
+
+  const period = periodOf(entry.habit, today);
+  const expected = expectedByNow(entry.target, period, today);
+  const behind = expected - entry.count;
+  const left = `${remaining} to go`;
+
+  if (behind > 0) return `${left} · ${behind} behind`;
+  return `${left} · on track`;
 }

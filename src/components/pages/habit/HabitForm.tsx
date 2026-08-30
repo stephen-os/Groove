@@ -27,6 +27,15 @@ const KINDS: readonly { readonly kind: ScheduleKind; readonly label: string }[] 
 const COUNTS: readonly number[] = [1, 2, 3, 4, 5, 6, 7];
 const TARGETS: readonly number[] = [60, 70, 80, 90, 100];
 
+// What each follow-up count actually means, said in the words a person would
+// use rather than as a bare number.
+const NAGS: readonly { readonly count: number; readonly label: string }[] = [
+  { count: 0, label: 'Once' },
+  { count: 1, label: '+15m' },
+  { count: 2, label: '+15/30m' },
+  { count: 3, label: '+15/30/60m' },
+];
+
 export const EMPTY_HABIT: HabitInput = {
   name: '',
   scheduleKind: 'daily',
@@ -34,6 +43,7 @@ export const EMPTY_HABIT: HabitInput = {
   targetCount: 3,
   dueTime: null,
   remindEnabled: false,
+  followUps: 3,
   targetPct: 80,
 };
 
@@ -56,6 +66,7 @@ export function HabitForm({ initial, submitLabel, onSubmit }: HabitFormProps) {
   const [targetCount, setTargetCount] = useState(initial.targetCount);
   const [dueTime, setDueTime] = useState(initial.dueTime ?? '');
   const [remindEnabled, setRemindEnabled] = useState(initial.remindEnabled);
+  const [followUps, setFollowUps] = useState(initial.followUps);
   const [targetPct, setTargetPct] = useState(initial.targetPct);
 
   const [nameError, setNameError] = useState<string | undefined>(undefined);
@@ -96,6 +107,7 @@ export function HabitForm({ initial, submitLabel, onSubmit }: HabitFormProps) {
       targetCount: kind === 'daily' ? 1 : targetCount,
       dueTime: trimmedTime.length === 0 ? null : trimmedTime,
       remindEnabled: trimmedTime.length === 0 ? false : remindEnabled,
+      followUps,
       targetPct,
     })
       .catch((error: unknown) => {
@@ -209,6 +221,35 @@ export function HabitForm({ initial, submitLabel, onSubmit }: HabitFormProps) {
           {remindEnabled ? 'Reminders on' : 'Reminders off'}
         </Text>
       </Pressable>
+
+      {remindEnabled && (
+        <View style={styles.group} accessibilityRole="radiogroup">
+          <Text variant="caption" tone="muted">
+            How much chasing
+          </Text>
+          <View style={styles.chips}>
+            {NAGS.map((option) => {
+              const selected = followUps === option.count;
+              return (
+                <Pressable
+                  key={option.count}
+                  onPress={() => setFollowUps(option.count)}
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked: selected }}
+                  accessibilityHint={
+                    option.count === 0
+                      ? 'One notification at the due time and nothing more'
+                      : `Follow-up notifications until the habit is ticked`
+                  }
+                  style={chipStyle(selected)}
+                >
+                  <Text style={chipText(selected)}>{option.label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      )}
 
       <View style={styles.group} accessibilityRole="radiogroup">
         <Text variant="caption" tone="muted">

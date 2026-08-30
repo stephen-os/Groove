@@ -6,7 +6,12 @@ import { Button } from '@/components/ui/Button';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { fromDayKey, todayKey } from '@/lib/date';
-import { completionsBetween, setDone, type Completion } from '@/lib/db/completions';
+import {
+  completionsBetween,
+  setStatus,
+  type Completion,
+  type CompletionStatus,
+} from '@/lib/db/completions';
 import { listHabits, type Habit } from '@/lib/db/habits';
 import { getActiveProfileId } from '@/lib/db/profiles';
 import { cancelDayChain, syncReminders } from '@/lib/reminders';
@@ -16,6 +21,7 @@ import {
   indexCompletions,
   isEmpty,
   monthRange,
+  paceLabel,
   weekRange,
 } from '@/lib/schedule';
 import { spacing } from '@/lib/theme';
@@ -23,8 +29,9 @@ import { spacing } from '@/lib/theme';
 interface Row {
   readonly habit: Habit;
   readonly done: boolean;
-  /** "1/3" for a flexible habit; absent for a daily one, which is just done or not. */
-  readonly progress?: string;
+  readonly skipped: boolean;
+  /** "2 to go · on track" for a flexible habit; absent for a daily one. */
+  readonly pace?: string;
 }
 
 export default function TodayScreen() {
@@ -83,60 +90,60 @@ export default function TodayScreen() {
     if (due.daily.length > 0) {
       built.push({
         title: 'Today',
-        data: due.daily.map((entry) => ({ habit: entry.habit, done: entry.done })),
-      });
-    }
-    if (due.weekly.length > 0) {
-      built.push({
-        title: 'This week',
-        data: due.weekly.map((entry) => ({
+        data: due.daily.map((entry) => ({
           habit: entry.habit,
           done: entry.done,
-          progress: `${entry.count}/${entry.target}`,
+          skipped: entry.skipped,
         })),
       });
     }
-    if (due.monthly.length > 0) {
+    for (const [title, entries] of [
+      ['This week', due.weekly],
+      ['This month', due.monthly],
+    ] as const) {
+      if (entries.length === 0) continue;
       built.push({
-        title: 'This month',
-        data: due.monthly.map((entry) => ({
+        title,
+        data: entries.map((entry) => ({
           habit: entry.habit,
           done: entry.done,
-          progress: `${entry.count}/${entry.target}`,
+          skipped: entry.skipped,
+          pace: paceLabel(entry, day),
         })),
       });
     }
     return built;
-  }, [due]);
+  }, [due, day]);
 
-  const toggle = useCallback(
-    (habit: Habit, next: boolean): void => {
+  const mark = useCallback(
+    (habit: Habit, next: CompletionStatus | null): void => {
+      const previous = completions;
+
       // Update first, persist after: a checkbox that waits on SQLite before it
       // moves feels broken. The id is a placeholder — nothing downstream reads
       // it, and the next focus reload replaces the row with the real one.
-      setCompletions((current) =>
-        next
-          ? [...current, { id: -Date.now(), habitId: habit.id, day, doneAt: Date.now() }]
-          : current.filter((entry) => !(entry.habitId === habit.id && entry.day === day))
-      );
-
-      // Ticking silences the rest of today's chain immediately — that is the
-      // whole point of it. Un-ticking has to put the chain back, which needs a
-      // full replan, so it takes the slower path.
-      if (next) void cancelDayChain(habit.id, day);
-      else void syncReminders();
-
-      setDone(habit.id, day, next).catch((error: unknown) => {
-        console.error('Could not save that tick:', error);
-        setCompletions((current) =>
-          next
-            ? current.filter((entry) => !(entry.habitId === habit.id && entry.day === day))
-            : [...current, { id: -Date.now(), habitId: habit.id, day, doneAt: Date.now() }]
+      setCompletions((current) => {
+        const without = current.filter(
+          (entry) => !(entry.habitId === habit.id && entry.day === day)
         );
+        return next === null
+          ? without
+          : [...without, { id: -Date.now(), habitId: habit.id, day, status: next, doneAt: Date.now() }];
+      });
+
+      // Having dealt with a habit — either way — silences the rest of today's
+      // chain immediately. Undoing has to put it back, which needs a full
+      // replan, so that takes the slower path.
+      if (next === null) void syncReminders();
+      else void cancelDayChain(habit.id, day);
+
+      setStatus(habit.id, day, next).catch((error: unknown) => {
+        console.error('Could not save that change:', error);
+        setCompletions(previous);
         Alert.alert('Could not save that.');
       });
     },
-    [day]
+    [completions, day]
   );
 
   const nothingDue = loaded && isEmpty(due);
@@ -181,8 +188,10 @@ export default function TodayScreen() {
             name={item.habit.name}
             schedule={describeSchedule(item.habit)}
             done={item.done}
-            progress={item.progress}
-            onToggle={() => toggle(item.habit, !item.done)}
+            skipped={item.skipped}
+            pace={item.pace}
+            onToggle={() => mark(item.habit, item.done ? null : 'done')}
+            onSkip={() => mark(item.habit, item.skipped ? null : 'skipped')}
           />
         )}
       />

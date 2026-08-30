@@ -4,11 +4,13 @@ import type { Completion } from '@/lib/db/completions';
 import type { Habit, ScheduleKind } from '@/lib/db/habits';
 import {
   archivedOn,
-  countInRange,
+  countStatus,
   describeSchedule,
   habitsDueOn,
   indexCompletions,
   isActiveOn,
+  effectiveTarget,
+  expectedByNow,
   isEmpty,
   monthRange,
   weekRange,
@@ -38,6 +40,7 @@ const habit = (overrides: Partial<Habit> & { scheduleKind?: ScheduleKind } = {})
   targetCount: 1,
   dueTime: null,
   remindEnabled: false,
+  followUps: 3,
   targetPct: 80,
   startsOn: '2026-01-01',
   archivedAt: null,
@@ -47,7 +50,22 @@ const habit = (overrides: Partial<Habit> & { scheduleKind?: ScheduleKind } = {})
 });
 
 const done = (habitId: number, days: readonly string[]): Completion[] =>
-  days.map((day, index) => ({ id: habitId * 1000 + index, habitId, day, doneAt: 0 }));
+  days.map((day, index) => ({
+    id: habitId * 1000 + index,
+    habitId,
+    day,
+    status: 'done' as const,
+    doneAt: 0,
+  }));
+
+const skip = (habitId: number, days: readonly string[]): Completion[] =>
+  days.map((day, index) => ({
+    id: habitId * 100_000 + index,
+    habitId,
+    day,
+    status: 'skipped' as const,
+    doneAt: 0,
+  }));
 
 describe('weekRange', () => {
   it('runs Monday to Sunday', () => {
@@ -115,15 +133,83 @@ describe('isActiveOn', () => {
   });
 });
 
-describe('countInRange', () => {
-  const days = new Set(['2026-08-30', '2026-08-31', '2026-09-01', '2026-09-30']);
+describe('countStatus', () => {
+  const days = indexCompletions([
+    ...done(1, ['2026-08-30', '2026-08-31', '2026-09-01', '2026-09-30']),
+    ...skip(1, ['2026-09-02']),
+  ]).get(1);
 
   it('counts only days inside the range, inclusive at both ends', () => {
-    expect(countInRange(days, { from: '2026-08-31', to: '2026-09-01' })).toBe(2);
+    expect(countStatus(days, { from: '2026-08-31', to: '2026-09-01' }, 'done')).toBe(2);
+  });
+
+  it('counts each status separately', () => {
+    const whole = { from: '2026-08-01', to: '2026-09-30' };
+    expect(countStatus(days, whole, 'done')).toBe(4);
+    expect(countStatus(days, whole, 'skipped')).toBe(1);
   });
 
   it('is zero for a habit with no completions', () => {
-    expect(countInRange(undefined, { from: '2026-08-01', to: '2026-08-31' })).toBe(0);
+    expect(countStatus(undefined, { from: '2026-08-01', to: '2026-08-31' }, 'done')).toBe(0);
+  });
+});
+
+describe('habitsDueOn — skipping', () => {
+  it('reports a skipped habit as skipped, not done', () => {
+    const teeth = habit();
+    const [entry] = habitsDueOn([teeth], indexCompletions(skip(teeth.id, [MON])), MON).daily;
+    expect(entry.skipped).toBe(true);
+    expect(entry.done).toBe(false);
+  });
+
+  it('keeps a skipped habit visible so the skip can be undone', () => {
+    const teeth = habit();
+    expect(habitsDueOn([teeth], indexCompletions(skip(teeth.id, [MON])), MON).daily).toHaveLength(1);
+  });
+
+  it('takes a skipped day off a flexible habit’s target', () => {
+    const gym = habit({ scheduleKind: 'weekly', targetCount: 3, name: 'Gym' });
+    const index = indexCompletions([...done(gym.id, [MON]), ...skip(gym.id, [TUE])]);
+    const [entry] = habitsDueOn([gym], index, THU).weekly;
+    // Three a week, one opted out of, so two are needed and one is done.
+    expect(entry.target).toBe(2);
+    expect(entry.count).toBe(1);
+  });
+
+  it('lets skips alone satisfy a flexible habit', () => {
+    const gym = habit({ scheduleKind: 'weekly', targetCount: 2, name: 'Gym' });
+    const index = indexCompletions(skip(gym.id, [MON, TUE]));
+    expect(habitsDueOn([gym], index, THU).weekly).toHaveLength(0);
+  });
+
+  it('never puts a habit in credit for skipping more than the target', () => {
+    const gym = habit({ scheduleKind: 'weekly', targetCount: 1, name: 'Gym' });
+    const index = indexCompletions(skip(gym.id, [MON, TUE, THU]));
+    const period = weekRange(MON);
+    expect(effectiveTarget(gym, index.get(gym.id), period)).toBe(0);
+  });
+});
+
+describe('expectedByNow', () => {
+  const week = weekRange(MON); // Mon 31 Aug – Sun 6 Sep
+
+  it('expects nothing on the opening days of a period', () => {
+    expect(expectedByNow(3, week, MON)).toBe(0);
+    expect(expectedByNow(3, week, TUE)).toBe(0);
+  });
+
+  it('ramps up as the period elapses', () => {
+    expect(expectedByNow(3, week, THU)).toBe(1);
+    expect(expectedByNow(3, week, '2026-09-05')).toBe(2);
+  });
+
+  it('expects the whole target once the period is over', () => {
+    expect(expectedByNow(3, week, SUN)).toBe(3);
+    expect(expectedByNow(3, week, '2026-09-20')).toBe(3);
+  });
+
+  it('expects nothing before the period has started', () => {
+    expect(expectedByNow(3, week, '2026-08-01')).toBe(0);
   });
 });
 

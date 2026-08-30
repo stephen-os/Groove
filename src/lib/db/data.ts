@@ -78,9 +78,9 @@ export async function replaceData(data: GrooveData): Promise<void> {
       await db.runAsync(
         `INSERT INTO habits (
            id, profile_id, name, icon, color, sort_order, schedule_kind,
-           weekday_mask, target_count, due_time, remind_enabled, target_pct,
-           starts_on, archived_at, created_at, updated_at
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           weekday_mask, target_count, due_time, remind_enabled, follow_ups,
+           target_pct, starts_on, archived_at, created_at, updated_at
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           habit.id,
           habit.profileId,
@@ -93,6 +93,7 @@ export async function replaceData(data: GrooveData): Promise<void> {
           habit.targetCount,
           habit.dueTime,
           habit.remindEnabled ? 1 : 0,
+          habit.followUps,
           habit.targetPct,
           habit.startsOn,
           habit.archivedAt,
@@ -104,8 +105,8 @@ export async function replaceData(data: GrooveData): Promise<void> {
 
     for (const completion of data.completions) {
       await db.runAsync(
-        'INSERT INTO completions (id, habit_id, day, done_at) VALUES (?, ?, ?, ?)',
-        [completion.id, completion.habitId, completion.day, completion.doneAt]
+        'INSERT INTO completions (id, habit_id, day, status, done_at) VALUES (?, ?, ?, ?, ?)',
+        [completion.id, completion.habitId, completion.day, completion.status, completion.doneAt]
       );
     }
 

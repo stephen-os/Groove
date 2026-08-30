@@ -25,6 +25,8 @@ export interface Habit {
   /** 'HH:MM' local wall clock, or null when the habit has no due time. */
   dueTime: string | null;
   remindEnabled: boolean;
+  /** Follow-up nags after the due-time alert, 0–3. Zero means one and done. */
+  followUps: number;
   targetPct: number;
   startsOn: DayKey;
   /** Epoch milliseconds, or null while the habit is active. */
@@ -47,6 +49,7 @@ interface HabitRow {
   target_count: number;
   due_time: string | null;
   remind_enabled: number;
+  follow_ups: number;
   target_pct: number;
   starts_on: string;
   archived_at: number | null;
@@ -78,6 +81,7 @@ export const toHabit = (row: HabitRow): Habit => ({
   targetCount: row.target_count,
   dueTime: row.due_time,
   remindEnabled: row.remind_enabled !== 0,
+  followUps: row.follow_ups,
   targetPct: row.target_pct,
   startsOn: row.starts_on,
   archivedAt: row.archived_at,
@@ -86,7 +90,7 @@ export const toHabit = (row: HabitRow): Habit => ({
 });
 
 const SELECT_COLUMNS =
-  'id, profile_id, name, icon, color, sort_order, schedule_kind, weekday_mask, target_count, due_time, remind_enabled, target_pct, starts_on, archived_at, created_at, updated_at';
+  'id, profile_id, name, icon, color, sort_order, schedule_kind, weekday_mask, target_count, due_time, remind_enabled, follow_ups, target_pct, starts_on, archived_at, created_at, updated_at';
 
 /** The active (non-archived) habits in a profile, in display order. */
 export async function listHabits(profileId: number): Promise<Habit[]> {
@@ -144,6 +148,7 @@ export interface HabitInput {
   targetCount: number;
   dueTime: string | null;
   remindEnabled: boolean;
+  followUps: number;
   targetPct: number;
 }
 
@@ -157,9 +162,10 @@ export async function createHabit(profileId: number, input: HabitInput): Promise
   const result = await db.runAsync(
     `INSERT INTO habits (
        profile_id, name, schedule_kind, weekday_mask, target_count,
-       due_time, remind_enabled, target_pct, starts_on, created_at, updated_at, sort_order
+       due_time, remind_enabled, follow_ups, target_pct, starts_on,
+       created_at, updated_at, sort_order
      )
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
        (SELECT COALESCE(MAX(sort_order), -1) + 1 FROM habits WHERE profile_id = ?))`,
     [
       profileId,
@@ -169,6 +175,7 @@ export async function createHabit(profileId: number, input: HabitInput): Promise
       input.targetCount,
       input.dueTime,
       input.remindEnabled ? 1 : 0,
+      input.followUps,
       input.targetPct,
       todayKey(),
       now,
@@ -194,7 +201,7 @@ export async function updateHabit(id: number, input: HabitInput): Promise<void> 
   await db.runAsync(
     `UPDATE habits SET
        name = ?, schedule_kind = ?, weekday_mask = ?, target_count = ?,
-       due_time = ?, remind_enabled = ?, target_pct = ?, updated_at = ?
+       due_time = ?, remind_enabled = ?, follow_ups = ?, target_pct = ?, updated_at = ?
      WHERE id = ?`,
     [
       input.name,
@@ -203,6 +210,7 @@ export async function updateHabit(id: number, input: HabitInput): Promise<void> 
       input.targetCount,
       input.dueTime,
       input.remindEnabled ? 1 : 0,
+      input.followUps,
       input.targetPct,
       Date.now(),
       id,

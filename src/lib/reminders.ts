@@ -1,6 +1,6 @@
 import type { NotificationResponse } from 'expo-notifications';
 import { addDays, todayKey } from './date';
-import { completionsBetween, setDone } from './db/completions';
+import { completionsBetween, setStatus } from './db/completions';
 import { getHabit, listHabits } from './db/habits';
 import {
   addScheduledNotif,
@@ -153,7 +153,7 @@ export async function handleReminderResponse(response: NotificationResponse): Pr
 
   try {
     if (response.actionIdentifier === DONE_ACTION) {
-      await setDone(payload.habitId, payload.day, true);
+      await setStatus(payload.habitId, payload.day, 'done');
       await cancelDayChain(payload.habitId, payload.day);
       return;
     }

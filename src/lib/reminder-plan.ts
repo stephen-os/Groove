@@ -20,8 +20,11 @@ import { habitsDueOn, type CompletionIndex } from './schedule';
  */
 export const HORIZON_DAYS = 7;
 
-/** Minutes after the due time at which the chain nags again. */
-const FOLLOW_UPS: readonly number[] = [15, 30, 60];
+/** Minutes after the due time at which the chain nags again, in order. */
+const FOLLOW_UP_OFFSETS: readonly number[] = [15, 30, 60];
+
+/** The most follow-ups a habit can ask for. */
+const MAX_FOLLOW_UPS = FOLLOW_UP_OFFSETS.length;
 
 /**
  * A hard ceiling on pending alerts, whatever the horizon works out to.
@@ -44,11 +47,16 @@ export interface PlannedAlert {
   readonly body: string;
 }
 
-/** Every habit due on `day` that wants a reminder and has not been ticked. */
+/**
+ * Every habit due on `day` that wants a reminder and has not been dealt with.
+ *
+ * A skipped habit is deliberately excluded: opting out of a day is exactly the
+ * moment you have said you do not want chasing about it.
+ */
 function remindableOn(habits: readonly Habit[], completions: CompletionIndex, day: DayKey) {
   const due = habitsDueOn(habits, completions, day);
   return [...due.daily, ...due.weekly, ...due.monthly]
-    .filter((entry) => !entry.done)
+    .filter((entry) => !entry.done && !entry.skipped)
     .map((entry) => entry.habit)
     .filter((habit) => habit.remindEnabled && habit.dueTime !== null);
 }
@@ -57,17 +65,20 @@ function remindableOn(habits: readonly Habit[], completions: CompletionIndex, da
  * The alerts that should be pending right now.
  *
  * Walks the horizon a day at a time, asking the schedule engine what is due and
- * skipping anything already done. Alerts whose moment has passed are dropped
- * here rather than handed to the OS: a trigger in the past fires immediately on
- * some Android versions and is discarded on others, and neither is what the
- * user asked for.
+ * skipping anything already done or skipped.
+ *
+ * Two alerts are dropped rather than handed to the OS. One whose moment has
+ * passed: a trigger in the past fires immediately on some Android versions and
+ * is discarded on others, and neither is what the user asked for. And one that
+ * would land after its own day is over — an 11:30pm habit must not chase you at
+ * half past midnight about yesterday, which is the whole point of a day being
+ * the unit here.
  */
 export function planAlerts(
   habits: readonly Habit[],
   completions: CompletionIndex,
   now: Date = new Date(),
   horizonDays: number = HORIZON_DAYS,
-  followUps: readonly number[] = FOLLOW_UPS,
   maxAlerts: number = MAX_ALERTS
 ): PlannedAlert[] {
   const alerts: PlannedAlert[] = [];
@@ -76,6 +87,9 @@ export function planAlerts(
 
   for (let offset = 0; offset < horizonDays; offset += 1) {
     const day = addDays(start, offset);
+    // Midnight opening the next day. Nothing for this day may fire at or after
+    // it, so a late due time simply gets a shorter chain.
+    const dayEndsAt = atTimeOn(addDays(day, 1), '00:00').getTime();
 
     for (const habit of remindableOn(habits, completions, day)) {
       // Narrowed by remindableOn, but TypeScript cannot see through the filter.
@@ -83,11 +97,13 @@ export function planAlerts(
       if (dueTime === null) continue;
 
       const dueAt = atTimeOn(day, dueTime).getTime();
-      const offsets = [0, ...followUps];
+      const wanted = Math.min(Math.max(habit.followUps, 0), MAX_FOLLOW_UPS);
+      const offsets = [0, ...FOLLOW_UP_OFFSETS.slice(0, wanted)];
 
       offsets.forEach((minutes, sequence) => {
         const fireAt = dueAt + minutes * 60_000;
         if (fireAt <= nowMs) return;
+        if (fireAt >= dayEndsAt) return;
         alerts.push({
           habitId: habit.id,
           day,

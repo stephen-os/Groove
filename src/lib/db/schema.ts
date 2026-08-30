@@ -41,6 +41,10 @@ export const SCHEMA: readonly string[] = [
     -- wall-clock string, not an offset: 7am must stay 7am after a flight.
     due_time       TEXT,
     remind_enabled INTEGER NOT NULL DEFAULT 0,
+    -- How many follow-up nags after the due-time alert, 0 to 3. Zero means one
+    -- notification and no chasing, which is the right setting for a habit you
+    -- want a nudge about but not a pestering.
+    follow_ups     INTEGER NOT NULL DEFAULT 3,
     -- The completion rate this habit is graded against, as a percentage.
     target_pct     INTEGER NOT NULL DEFAULT 80,
     -- 'YYYY-MM-DD'. Statistics never look before this, so a habit added today
@@ -62,6 +66,11 @@ export const SCHEMA: readonly string[] = [
     id       INTEGER PRIMARY KEY AUTOINCREMENT,
     habit_id INTEGER NOT NULL REFERENCES habits(id) ON DELETE CASCADE,
     day      TEXT    NOT NULL,
+    -- 'done' or 'skipped'. Skipping is opting out of that one opportunity: it
+    -- silences the reminder and is removed from the denominator, so a day you
+    -- were ill or away does not read as a failure. The absence of a row is the
+    -- third state -- not done, and counted against you.
+    status   TEXT    NOT NULL DEFAULT 'done',
     done_at  INTEGER NOT NULL
   )`,
   // Unique, not merely indexed: "done twice today" is not a state this app has,

@@ -2,27 +2,35 @@ import { addDays, maskIncludes, type DayKey } from './date';
 import type { Habit } from './db/habits';
 import {
   archivedOn,
-  countInRange,
-  monthRange,
-  weekRange,
+  countStatus,
+  effectiveTarget,
+  expectedByNow,
+  periodOf,
   type CompletionIndex,
   type DayRange,
+  type DayStatuses,
 } from './schedule';
 
 // How well a habit is going. Pure, like the schedule engine it sits on.
 //
 // The number that matters is the completion rate, and the thing most habit
-// trackers get wrong is its denominator: it is the days the habit was actually
-// *scheduled*, not the days on the calendar. Gym on Mon–Thu across a 30-day
-// month is roughly 17 opportunities, not 30.
+// trackers get wrong is its denominator. Two rules shape it here:
+//
+//  - It counts days the habit was actually *scheduled*, not days on the
+//    calendar. Gym on Mon–Thu across September 2026 is 18 opportunities, not 30.
+//  - It excludes days that were deliberately skipped, and prorates a period
+//    that is still running. You cannot be marked down for days that have not
+//    happened yet, or for ones you opted out of.
 
 export interface HabitStats {
   readonly habit: Habit;
   /** Completions inside the range that counted towards the target. */
   readonly done: number;
-  /** Opportunities inside the range — scheduled days, or periods x target. */
+  /** Opportunities inside the range, after skips and proration. */
   readonly scheduled: number;
-  /** 0–100. A habit with no opportunities in the range scores 100, not 0. */
+  /** Days deliberately opted out of. Reported so the UI can say so. */
+  readonly skipped: number;
+  /** 0–100. A habit with no opportunities yet scores 100, not 0. */
   readonly pct: number;
   readonly streak: number;
   readonly best: number;
@@ -48,50 +56,54 @@ function effectiveRange(habit: Habit, range: DayRange, today: DayKey): DayRange 
 /**
  * Opportunities and completions for a habit inside a range.
  *
- * Daily habits count scheduled days. Flexible ones count whole periods: each
- * week or month that overlaps the range contributes its full target, and the
- * completions inside it are capped at that target so an unusually good week
- * cannot pay for a bad one.
- *
- * A period still in progress contributes its full target, which reads as
- * pessimistic on a Monday. That is deliberate: the alternative is prorating by
- * elapsed days, which makes the same week score differently depending on when
- * you look at it.
+ * Daily habits count scheduled days, minus the ones skipped. Flexible ones count
+ * whole periods: each contributes its target after skips, and a period still in
+ * progress contributes only what is expected *by now* — so looking at your week
+ * on Tuesday does not judge you on Thursday's session.
  */
 function tally(
   habit: Habit,
-  days: ReadonlySet<DayKey> | undefined,
+  days: DayStatuses | undefined,
   range: DayRange,
   today: DayKey
-): { done: number; scheduled: number } {
+): { done: number; scheduled: number; skipped: number } {
   const effective = effectiveRange(habit, range, today);
-  if (effective === null) return { done: 0, scheduled: 0 };
+  if (effective === null) return { done: 0, scheduled: 0, skipped: 0 };
 
   if (habit.scheduleKind === 'daily') {
     let done = 0;
     let scheduled = 0;
+    let skipped = 0;
     for (let day = effective.from; day <= effective.to; day = addDays(day, 1)) {
       if (!maskIncludes(habit.weekdayMask, day)) continue;
+      const status = days?.get(day);
+      if (status === 'skipped') {
+        skipped += 1;
+        continue;
+      }
       scheduled += 1;
-      if (days?.has(day)) done += 1;
+      if (status === 'done') done += 1;
     }
-    return { done, scheduled };
+    return { done, scheduled, skipped };
   }
 
-  const rangeOf = habit.scheduleKind === 'weekly' ? weekRange : monthRange;
   let done = 0;
   let scheduled = 0;
+  let skipped = 0;
   let cursor = effective.from;
   while (cursor <= effective.to) {
-    const period = rangeOf(cursor);
+    const period = periodOf(habit, cursor);
     // Completions are counted across the whole period, not just the slice of it
     // inside the range — a target is met by the week, not by the query window.
-    const count = countInRange(days, period);
-    scheduled += habit.targetCount;
-    done += Math.min(count, habit.targetCount);
+    const count = countStatus(days, period, 'done');
+    const target = expectedByNow(effectiveTarget(habit, days, period), period, today);
+    scheduled += target;
+    // Capped at the target so an unusually good week cannot pay for a bad one.
+    done += Math.min(count, target);
+    skipped += countStatus(days, period, 'skipped');
     cursor = addDays(period.to, 1);
   }
-  return { done, scheduled };
+  return { done, scheduled, skipped };
 }
 
 /**
@@ -99,11 +111,12 @@ function tally(
  *
  * An opportunity still open — today, for a daily habit; this week, for a weekly
  * one — does not break the streak. Not having done it *yet* is not the same as
- * having missed it.
+ * having missed it. A skipped day breaks nothing either: opting out is not
+ * failing, so the streak steps over it exactly as it steps over a rest day.
  */
 export function currentStreak(
   habit: Habit,
-  days: ReadonlySet<DayKey> | undefined,
+  days: DayStatuses | undefined,
   today: DayKey
 ): number {
   const end = lastCountedDay(habit, today);
@@ -112,30 +125,32 @@ export function currentStreak(
     let streak = 0;
     let cursor = end;
     // Today is still open, so skip past it rather than counting it as a miss.
-    if (maskIncludes(habit.weekdayMask, cursor) && !days?.has(cursor)) {
+    if (maskIncludes(habit.weekdayMask, cursor) && days?.get(cursor) !== 'done') {
       cursor = addDays(cursor, -1);
     }
     while (cursor >= habit.startsOn) {
       if (maskIncludes(habit.weekdayMask, cursor)) {
-        if (!days?.has(cursor)) break;
-        streak += 1;
+        const status = days?.get(cursor);
+        if (status === 'done') streak += 1;
+        else if (status !== 'skipped') break;
       }
       cursor = addDays(cursor, -1);
     }
     return streak;
   }
 
-  const rangeOf = habit.scheduleKind === 'weekly' ? weekRange : monthRange;
+  const met = (day: DayKey): boolean => {
+    const period = periodOf(habit, day);
+    return countStatus(days, period, 'done') >= effectiveTarget(habit, days, period);
+  };
+
   let streak = 0;
   let anchor = end;
-  if (countInRange(days, rangeOf(anchor)) < habit.targetCount) {
-    anchor = addDays(rangeOf(anchor).from, -1);
-  }
+  if (!met(anchor)) anchor = addDays(periodOf(habit, anchor).from, -1);
   while (anchor >= habit.startsOn) {
-    const period = rangeOf(anchor);
-    if (countInRange(days, period) < habit.targetCount) break;
+    if (!met(anchor)) break;
     streak += 1;
-    anchor = addDays(period.from, -1);
+    anchor = addDays(periodOf(habit, anchor).from, -1);
   }
   return streak;
 }
@@ -143,7 +158,7 @@ export function currentStreak(
 /** The longest run of met opportunities over the habit's whole life. */
 export function longestStreak(
   habit: Habit,
-  days: ReadonlySet<DayKey> | undefined,
+  days: DayStatuses | undefined,
   today: DayKey
 ): number {
   const end = lastCountedDay(habit, today);
@@ -155,17 +170,20 @@ export function longestStreak(
   if (habit.scheduleKind === 'daily') {
     for (let day = habit.startsOn; day <= end; day = addDays(day, 1)) {
       if (!maskIncludes(habit.weekdayMask, day)) continue;
-      run = days?.has(day) ? run + 1 : 0;
+      const status = days?.get(day);
+      if (status === 'skipped') continue;
+      run = status === 'done' ? run + 1 : 0;
       if (run > best) best = run;
     }
     return best;
   }
 
-  const rangeOf = habit.scheduleKind === 'weekly' ? weekRange : monthRange;
   let cursor = habit.startsOn;
   while (cursor <= end) {
-    const period = rangeOf(cursor);
-    run = countInRange(days, period) >= habit.targetCount ? run + 1 : 0;
+    const period = periodOf(habit, cursor);
+    const met =
+      countStatus(days, period, 'done') >= effectiveTarget(habit, days, period);
+    run = met ? run + 1 : 0;
     if (run > best) best = run;
     cursor = addDays(period.to, 1);
   }
@@ -180,7 +198,7 @@ export function statsFor(
   today: DayKey
 ): HabitStats {
   const days = completions.get(habit.id);
-  const { done, scheduled } = tally(habit, days, range, today);
+  const { done, scheduled, skipped } = tally(habit, days, range, today);
   // No opportunities is not a failure — a habit added yesterday has not missed
   // anything, and scoring it 0 would drag the whole grade down for no reason.
   const pct = scheduled === 0 ? 100 : Math.round((done / scheduled) * 100);
@@ -189,6 +207,7 @@ export function statsFor(
     habit,
     done,
     scheduled,
+    skipped,
     pct,
     streak: currentStreak(habit, days, today),
     best: longestStreak(habit, days, today),
@@ -198,7 +217,7 @@ export function statsFor(
 
 /** Whether a habit is worth showing in the range at all. */
 export function hadOpportunities(stats: HabitStats): boolean {
-  return stats.scheduled > 0;
+  return stats.scheduled > 0 || stats.skipped > 0;
 }
 
 export interface Grade {
@@ -214,7 +233,7 @@ export interface Grade {
  * would let a single daily habit drown out everything else.
  */
 export function overallGrade(all: readonly HabitStats[]): Grade {
-  const counted = all.filter(hadOpportunities);
+  const counted = all.filter((stats) => stats.scheduled > 0);
   if (counted.length === 0) return { pct: 100, letter: 'A' };
 
   const pct = Math.round(

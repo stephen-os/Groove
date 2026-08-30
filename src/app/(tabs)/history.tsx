@@ -6,7 +6,12 @@ import { HabitCheckRow } from '@/components/pages/habit/HabitCheckRow';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { addDays, fromDayKey, toDayKey, todayKey, WEEKDAYS } from '@/lib/date';
-import { completionsBetween, setDone, type Completion } from '@/lib/db/completions';
+import {
+  completionsBetween,
+  setStatus,
+  type Completion,
+  type CompletionStatus,
+} from '@/lib/db/completions';
 import { listHabitsWithArchived, type Habit } from '@/lib/db/habits';
 import { getActiveProfileId } from '@/lib/db/profiles';
 import { syncReminders } from '@/lib/reminders';
@@ -16,6 +21,7 @@ import {
   indexCompletions,
   isEmpty,
   monthRange,
+  paceLabel,
   weekRange,
 } from '@/lib/schedule';
 import { colors, MIN_TOUCH_TARGET, radius, spacing } from '@/lib/theme';
@@ -76,12 +82,15 @@ export default function HistoryScreen() {
     for (let day = grid.from; day <= grid.to; day = addDays(day, 1)) {
       const due = habitsDueOn(habits, index, day);
       const entries = [...due.daily, ...due.weekly, ...due.monthly];
-      const finished = entries.filter((entry) => entry.done).length;
+      // Skipped habits leave the denominator entirely — a day you opted out of
+      // should not read as a half-finished one.
+      const counted = entries.filter((entry) => !entry.skipped);
+      const finished = counted.filter((entry) => entry.done).length;
       built.push({
         day,
         inMonth: day >= month.from && day <= month.to,
         future: day > today,
-        ratio: entries.length === 0 ? null : finished / entries.length,
+        ratio: counted.length === 0 ? null : finished / counted.length,
       });
     }
     return built;
@@ -89,15 +98,21 @@ export default function HistoryScreen() {
 
   const due = useMemo(() => habitsDueOn(habits, index, selected), [habits, index, selected]);
 
-  const toggle = useCallback(
-    (habitId: number, next: boolean): void => {
-      setCompletions((current) =>
-        next
-          ? [...current, { id: -Date.now(), habitId, day: selected, doneAt: Date.now() }]
-          : current.filter((entry) => !(entry.habitId === habitId && entry.day === selected))
-      );
+  const mark = useCallback(
+    (habitId: number, next: CompletionStatus | null): void => {
+      setCompletions((current) => {
+        const without = current.filter(
+          (entry) => !(entry.habitId === habitId && entry.day === selected)
+        );
+        return next === null
+          ? without
+          : [
+              ...without,
+              { id: -Date.now(), habitId, day: selected, status: next, doneAt: Date.now() },
+            ];
+      });
 
-      setDone(habitId, selected, next)
+      setStatus(habitId, selected, next)
         // Editing a past day can change what is still due today — a weekly
         // target met retroactively should stop nagging.
         .then(syncReminders)
@@ -122,17 +137,20 @@ export default function HistoryScreen() {
     ...due.daily.map((entry) => ({
       habit: entry.habit,
       done: entry.done,
-      progress: undefined as string | undefined,
+      skipped: entry.skipped,
+      pace: undefined as string | undefined,
     })),
     ...due.weekly.map((entry) => ({
       habit: entry.habit,
       done: entry.done,
-      progress: `${entry.count}/${entry.target}`,
+      skipped: entry.skipped,
+      pace: paceLabel(entry, selected),
     })),
     ...due.monthly.map((entry) => ({
       habit: entry.habit,
       done: entry.done,
-      progress: `${entry.count}/${entry.target}`,
+      skipped: entry.skipped,
+      pace: paceLabel(entry, selected),
     })),
   ];
 
@@ -238,8 +256,10 @@ export default function HistoryScreen() {
               name={row.habit.name}
               schedule={describeSchedule(row.habit)}
               done={row.done}
-              progress={row.progress}
-              onToggle={() => toggle(row.habit.id, !row.done)}
+              skipped={row.skipped}
+              pace={row.pace}
+              onToggle={() => mark(row.habit.id, row.done ? null : 'done')}
+              onSkip={() => mark(row.habit.id, row.skipped ? null : 'skipped')}
             />
           ))
         )}

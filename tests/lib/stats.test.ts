@@ -29,6 +29,7 @@ const habit = (overrides: Partial<Habit> = {}): Habit => ({
   targetCount: 1,
   dueTime: null,
   remindEnabled: false,
+  followUps: 3,
   targetPct: 80,
   startsOn: '2026-01-01',
   archivedAt: null,
@@ -38,7 +39,22 @@ const habit = (overrides: Partial<Habit> = {}): Habit => ({
 });
 
 const done = (habitId: number, days: readonly string[]): Completion[] =>
-  days.map((day, index) => ({ id: habitId * 1000 + index, habitId, day, doneAt: 0 }));
+  days.map((day, index) => ({
+    id: habitId * 1000 + index,
+    habitId,
+    day,
+    status: 'done' as const,
+    doneAt: 0,
+  }));
+
+const skip = (habitId: number, days: readonly string[]): Completion[] =>
+  days.map((day, index) => ({
+    id: habitId * 100_000 + index,
+    habitId,
+    day,
+    status: 'skipped' as const,
+    doneAt: 0,
+  }));
 
 const daysOfSeptember = (count: number): string[] =>
   Array.from({ length: count }, (_, index) => `2026-09-${String(index + 1).padStart(2, '0')}`);
@@ -114,10 +130,12 @@ describe('statsFor — rate', () => {
 });
 
 describe('statsFor — flexible habits', () => {
-  it('counts each period as its full target', () => {
+  it('counts each finished period as its full target, and prorates the open one', () => {
     const gym = habit({ scheduleKind: 'weekly', targetCount: 3 });
-    // September 2026 overlaps five Monday-first weeks.
-    expect(stats(gym, []).scheduled).toBe(15);
+    // September 2026 overlaps five Monday-first weeks. Four have ended and
+    // contribute 3 each; the fifth (28 Sep – 4 Oct) is three days in on the
+    // 30th, so it asks for floor(3 x 3/7) = 1.
+    expect(stats(gym, []).scheduled).toBe(13);
   });
 
   it('caps a good week so it cannot pay for a bad one', () => {
@@ -136,6 +154,96 @@ describe('statsFor — flexible habits', () => {
     expect(result.scheduled).toBe(2);
     expect(result.done).toBe(2);
     expect(result.pct).toBe(100);
+  });
+});
+
+describe('statsFor — skipping', () => {
+  it('takes a skipped day out of the denominator', () => {
+    const teeth = habit();
+    const result = statsFor(
+      teeth,
+      indexCompletions([...done(teeth.id, daysOfSeptember(29)), ...skip(teeth.id, ['2026-09-30'])]),
+      SEPTEMBER,
+      '2026-09-30'
+    );
+    // 29 done, one opted out of, so 29 of 29 rather than 29 of 30.
+    expect(result.scheduled).toBe(29);
+    expect(result.done).toBe(29);
+    expect(result.skipped).toBe(1);
+    expect(result.pct).toBe(100);
+  });
+
+  it('does not let a skip count as a completion', () => {
+    const teeth = habit();
+    const result = statsFor(
+      teeth,
+      indexCompletions(skip(teeth.id, daysOfSeptember(30))),
+      SEPTEMBER,
+      '2026-09-30'
+    );
+    expect(result.done).toBe(0);
+    expect(result.scheduled).toBe(0);
+    expect(result.skipped).toBe(30);
+  });
+
+  it('reduces a flexible target rather than the day count', () => {
+    const gym = habit({ scheduleKind: 'weekly', targetCount: 3 });
+    const result = statsFor(
+      gym,
+      indexCompletions([
+        ...done(gym.id, ['2026-09-07', '2026-09-08']),
+        ...skip(gym.id, ['2026-09-09']),
+      ]),
+      { from: '2026-09-07', to: '2026-09-13' },
+      '2026-09-13'
+    );
+    // Three a week with one opted out of is two, and two were done.
+    expect(result.scheduled).toBe(2);
+    expect(result.done).toBe(2);
+    expect(result.pct).toBe(100);
+  });
+});
+
+describe('statsFor — proration', () => {
+  const week = { from: '2026-09-07', to: '2026-09-13' };
+
+  it('does not judge a week on days that have not happened', () => {
+    const gym = habit({ scheduleKind: 'weekly', targetCount: 3 });
+    // Monday morning, nothing done. Nothing is expected yet either.
+    const monday = statsFor(gym, indexCompletions([]), week, '2026-09-07');
+    expect(monday.scheduled).toBe(0);
+    expect(monday.pct).toBe(100);
+  });
+
+  it('starts expecting sessions as the week runs on', () => {
+    const gym = habit({ scheduleKind: 'weekly', targetCount: 3 });
+    const wednesday = statsFor(gym, indexCompletions([]), week, '2026-09-09');
+    expect(wednesday.scheduled).toBe(1);
+    expect(wednesday.pct).toBe(0);
+  });
+
+  it('reads 100% when you are keeping pace mid-week', () => {
+    const gym = habit({ scheduleKind: 'weekly', targetCount: 3 });
+    const result = statsFor(
+      gym,
+      indexCompletions(done(gym.id, ['2026-09-07'])),
+      week,
+      '2026-09-09'
+    );
+    expect(result.pct).toBe(100);
+  });
+
+  it('judges the whole target once the week is over', () => {
+    const gym = habit({ scheduleKind: 'weekly', targetCount: 3 });
+    const result = statsFor(
+      gym,
+      indexCompletions(done(gym.id, ['2026-09-07'])),
+      week,
+      '2026-09-13'
+    );
+    expect(result.scheduled).toBe(3);
+    expect(result.done).toBe(1);
+    expect(result.pct).toBe(33);
   });
 });
 
@@ -173,6 +281,16 @@ describe('currentStreak', () => {
   it('is zero when nothing has been done', () => {
     const teeth = habit({ startsOn: '2026-09-01' });
     expect(currentStreak(teeth, undefined, '2026-09-10')).toBe(0);
+  });
+
+  it('steps over a skipped day rather than breaking on it', () => {
+    const teeth = habit({ startsOn: '2026-09-01' });
+    const days = indexCompletions([
+      ...done(teeth.id, ['2026-09-08', '2026-09-10']),
+      ...skip(teeth.id, ['2026-09-09']),
+    ]).get(teeth.id);
+    // Opting out of the 9th is not failing it, so the run holds at two.
+    expect(currentStreak(teeth, days, '2026-09-10')).toBe(2);
   });
 
   it('counts met weeks for a flexible habit', () => {

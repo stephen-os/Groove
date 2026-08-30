@@ -69,6 +69,7 @@ export default function EditHabitScreen() {
           targetCount: habit.targetCount,
           dueTime: habit.dueTime,
           remindEnabled: habit.remindEnabled,
+          followUps: habit.followUps,
           targetPct: habit.targetPct,
         }}
         submitLabel="Save changes"
