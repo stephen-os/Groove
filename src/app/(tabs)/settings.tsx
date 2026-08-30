@@ -7,6 +7,7 @@ import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { exportBackup, importBackup } from '@/lib/backup-file';
 import { eraseAllData, getActiveProfileId, resetProfile } from '@/lib/db/profiles';
+import { seedDemoData } from '@/lib/db/seed';
 import { syncReminders } from '@/lib/reminders';
 import { spacing } from '@/lib/theme';
 
@@ -43,6 +44,25 @@ export default function SettingsScreen() {
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Replace', style: 'destructive', onPress: () => run(importBackup) },
+      ]
+    );
+  };
+
+  const confirmSeed = (): void => {
+    Alert.alert(
+      'Replace with demo data?',
+      'Every habit in this profile and its history are erased and replaced with ninety days of made-up history. It cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Seed',
+          style: 'destructive',
+          onPress: () =>
+            run(async () => {
+              const { habits, completions } = await seedDemoData();
+              return { ok: true, message: `Seeded ${habits} habits and ${completions} days.` };
+            }),
+        },
       ]
     );
   };
@@ -138,6 +158,24 @@ export default function SettingsScreen() {
             settings for this app. Alerts are placed a week ahead and refilled whenever you
             open Groove, so opening it occasionally is what keeps them coming.
           </Text>
+        </Card>
+
+        <Card>
+          <Text variant="heading">Demo data</Text>
+          <Text tone="muted">
+            Replaces this profile with nine habits and a worked ninety-day history, so the
+            calendar and the analytics have something to show. The same ninety days every
+            time, so screenshots stay comparable.
+          </Text>
+          <View style={styles.actions}>
+            <Button
+              label="Seed 90 days"
+              tone="secondary"
+              onPress={confirmSeed}
+              disabled={busy}
+              accessibilityHint="Erases this profile's habits and fills it with demo history"
+            />
+          </View>
         </Card>
 
         <Card>

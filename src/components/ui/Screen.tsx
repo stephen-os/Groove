@@ -1,6 +1,9 @@
 import { StyleSheet, View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, spacing } from '@/lib/theme';
+import { colors, gradients, spacing } from '@/lib/theme';
+
+/** The gutter every screen keeps between its content and the display edge. */
+const GUTTER = spacing.md;
 
 interface ScreenProps {
   children: React.ReactNode;
@@ -31,8 +34,12 @@ export function Screen({ children, edgeToEdgeBottom = false, style }: ScreenProp
         {
           paddingTop: insets.top,
           paddingBottom: edgeToEdgeBottom ? 0 : insets.bottom,
-          paddingLeft: insets.left,
-          paddingRight: insets.right,
+          // Added to the gutter rather than assigned over it. `paddingLeft` and
+          // `paddingRight` beat `paddingHorizontal` whatever the order, so
+          // setting them to a portrait phone's zero insets would silently
+          // delete the gutter and run every card off both edges.
+          paddingLeft: GUTTER + insets.left,
+          paddingRight: GUTTER + insets.right,
         },
         style,
       ]}
@@ -46,6 +53,6 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: colors.bg,
-    paddingHorizontal: spacing.md,
+    experimental_backgroundImage: gradients.page,
   },
 });

@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
 import { Text } from '@/components/ui/Text';
-import { colors, depth, MIN_TOUCH_TARGET, radius, spacing } from '@/lib/theme';
+import { colors, depth, gradients, MIN_TOUCH_TARGET, radius, spacing } from '@/lib/theme';
 
 interface ButtonProps {
   label: string;
@@ -55,6 +55,10 @@ export function Button({
       style={({ pressed }) => [
         styles.base,
         { backgroundColor },
+        // Only the filled tones carry the light; an outlined button is a hole
+        // in the page, not an object sitting on it.
+        tone === 'primary' ? styles.primaryLight : null,
+        tone === 'secondary' ? styles.secondaryLight : null,
         pressed ? styles.pressed : styles.raised,
         disabled ? styles.disabled : null,
         style,
@@ -79,6 +83,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   raised: { boxShadow: depth.raised },
+  primaryLight: { experimental_backgroundImage: gradients.accent },
+  secondaryLight: { experimental_backgroundImage: gradients.surface },
   pressed: { boxShadow: depth.sunken },
   disabled: { opacity: 0.45 },
   content: {

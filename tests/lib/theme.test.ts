@@ -31,6 +31,10 @@ const AA_UI = 3;
 // Pairs the app actually renders.
 const textPairs: [string, string, string][] = [
   ['fg on bg', colors.fg, colors.bg],
+  // The lit corner of the gradient is where light text has least to work with.
+  ['fg on the lit corner', colors.fg, colors.bgLight],
+  ['muted on the lit corner', colors.muted, colors.bgLight],
+  ['accent on the lit corner', colors.accent, colors.bgLight],
   ['fg on surface', colors.fg, colors.surface],
   ['fg on bgAlt', colors.fg, colors.bgAlt],
   ['muted on bg', colors.muted, colors.bg],

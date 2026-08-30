@@ -6,7 +6,8 @@ import { Text } from '@/components/ui/Text';
 import { TextField } from '@/components/ui/TextField';
 import { Bubble } from '@/components/ui/Bubble';
 import { EVERY_DAY, WEEKDAYS } from '@/lib/date';
-import { DEFAULT_ICON, HABIT_COLORS, HABIT_ICONS } from '@/lib/habit-style';
+import { HabitFace } from '@/components/pages/habit/HabitFace';
+import { DEFAULT_ICON, HABIT_COLORS, HABIT_EMOJI, HABIT_ICONS } from '@/lib/habit-style';
 import type { HabitInput, ScheduleKind } from '@/lib/db/habits';
 import { colors, depth, MIN_TOUCH_TARGET, radius, spacing } from '@/lib/theme';
 
@@ -143,7 +144,7 @@ export function HabitForm({ initial, submitLabel, onSubmit }: HabitFormProps) {
           Icon
         </Text>
         <View style={styles.chips}>
-          {HABIT_ICONS.map((option) => {
+          {[...HABIT_EMOJI, ...HABIT_ICONS].map((option) => {
             const selected = icon === option;
             return (
               <Pressable
@@ -154,10 +155,10 @@ export function HabitForm({ initial, submitLabel, onSubmit }: HabitFormProps) {
                 accessibilityLabel={option.replace(/-outline$/, '').replace(/-/g, ' ')}
               >
                 <Bubble accent={selected} size={44}>
-                  <Ionicons
-                    name={option as never}
+                  <HabitFace
+                    icon={option}
+                    tint={selected ? colors.onAccent : color}
                     size={20}
-                    color={selected ? colors.onAccent : color}
                   />
                 </Bubble>
               </Pressable>

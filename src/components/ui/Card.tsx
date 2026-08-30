@@ -1,5 +1,5 @@
 import { StyleSheet, View, type ViewStyle } from 'react-native';
-import { colors, depth, radius, spacing } from '@/lib/theme';
+import { colors, depth, gradients, radius, spacing } from '@/lib/theme';
 
 interface CardProps {
   children: React.ReactNode;
@@ -26,6 +26,6 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     gap: spacing.xs,
   },
-  raised: { boxShadow: depth.raised },
+  raised: { boxShadow: depth.raised, experimental_backgroundImage: gradients.surface },
   sunken: { backgroundColor: colors.bgAlt, boxShadow: depth.sunken },
 });

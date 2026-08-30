@@ -35,7 +35,27 @@ export const HABIT_ICONS: readonly string[] = [
   'laptop-outline',
 ];
 
-export const DEFAULT_ICON = HABIT_ICONS[0];
+/**
+ * Emoji a habit can wear instead of a glyph.
+ *
+ * Stored in the same column as an icon name — one field, because a habit has
+ * one face. They are told apart by lookup rather than by a flag: an entry in
+ * `HABIT_ICONS` is drawn with Ionicons, anything else is drawn as text.
+ *
+ * An emoji brings its own colour, so the habit's tint does not apply to one.
+ */
+export const HABIT_EMOJI: readonly string[] = [
+  '🎯', '💪', '🏃', '🧘', '💧', '🥗', '😴', '📚',
+  '✍️', '🎸', '🧠', '🦷', '🚿', '🧹', '💊', '☀️',
+  '🌙', '💰', '📞', '🌱', '🐕', '☕', '🚭', '🎨',
+];
+
+export const DEFAULT_ICON = 'ellipse-outline';
+
+/** Whether this face is drawn as text rather than through Ionicons. */
+export function isEmoji(icon: string): boolean {
+  return icon.length > 0 && !HABIT_ICONS.includes(icon);
+}
 
 /**
  * Tints a habit can wear, all legible as a graphic on the page.
@@ -54,9 +74,16 @@ export const HABIT_COLORS: readonly string[] = [
   '#f98a8a',
 ];
 
-/** The stored glyph, or the default when a habit has never been given one. */
+/**
+ * The stored face, or a neutral default when a habit has never been given one.
+ *
+ * An emoji is passed through as typed — the set above is a shortcut, not a
+ * whitelist, so an emoji restored from a backup still renders even if it is not
+ * one this build happens to offer.
+ */
 export function habitIcon(icon: string): string {
-  return HABIT_ICONS.includes(icon) ? icon : DEFAULT_ICON;
+  if (icon.length === 0) return DEFAULT_ICON;
+  return icon;
 }
 
 /**

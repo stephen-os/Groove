@@ -1,4 +1,4 @@
-import type { BoxShadowValue } from 'react-native';
+import type { BackgroundImageValue, BoxShadowValue } from 'react-native';
 
 // The single source of colour, depth and spacing. Nothing else defines a hex
 // value, a shadow or a magic pixel number.
@@ -25,20 +25,28 @@ import type { BoxShadowValue } from 'react-native';
 // as a relative rather than a stranger.
 const slate = {
   // The lift and shade that carve a raised surface out of the page.
-  lift: '#3a3e46',
-  shade: '#1b1d21',
-  recess: '#24262a',
-  page: '#2c2f35',
-  border: '#40444c',
-  borderStrong: '#7c8089',
-  muted: '#9ea2ab',
-  fg: '#eceef1',
+  lift: '#32363e',
+  shade: '#0e1013',
+  recess: '#16181c',
+  // The page, and the two ends of the light falling across it. `page` is the
+  // majority colour — the gradient only leans a little either side of it.
+  page: '#1d2025',
+  pageLight: '#262930',
+  pageDark: '#171a1e',
+  surfaceLight: '#272b31',
+  surfaceDark: '#171a1f',
+  border: '#33373f',
+  borderStrong: '#767b85',
+  muted: '#9aa0aa',
+  fg: '#eef0f3',
 } as const;
 
 const hue = {
   // Bright enough to read as a highlight on charcoal, warm enough to feel like
   // a sunrise rather than a warning light.
   ember: '#ff8a3d',
+  emberLight: '#ffa563',
+  emberDark: '#f0741f',
   emberDim: '#c25a18',
   sage: '#5bd88a',
   rose: '#f98a8a',
@@ -51,6 +59,8 @@ export interface Colors {
   bg: string;
   /** Recessed fill: inputs, track backgrounds, anything pressed into the page. */
   bgAlt: string;
+  /** The lit corner of the page gradient — the tightest test any light text faces. */
+  bgLight: string;
   /** Raised surfaces. Deliberately identical to `bg`; the shadow is the edge. */
   surface: string;
   /** Primary text. */
@@ -77,6 +87,7 @@ export interface Colors {
 export const colors: Colors = {
   bg: slate.page,
   bgAlt: slate.recess,
+  bgLight: slate.pageLight,
   surface: slate.page,
   fg: slate.fg,
   muted: slate.muted,
@@ -88,6 +99,42 @@ export const colors: Colors = {
   success: hue.sage,
   error: hue.rose,
   warning: hue.amber,
+};
+
+/**
+ * The light falling across the app, as CSS gradients.
+ *
+ * One source, high and to the right: every surface is lit at its top-right
+ * corner and shaded at its bottom-left, and the paired shadows in `depth` throw
+ * from the same direction. Lighting a scene from two places is the fastest way
+ * to make a soft-UI layout look like a collage.
+ *
+ * `experimental_backgroundImage` is React Native's own CSS-gradient support —
+ * no dependency and no native build. The prefix is the API's, not a comment on
+ * how settled it is; the alternative is a native module for four colour stops.
+ */
+export const gradients: Record<'page' | 'surface' | 'accent', BackgroundImageValue[]> = {
+  page: [
+    {
+      type: 'linear-gradient',
+      direction: 'to bottom left',
+      colorStops: [{ color: slate.pageLight }, { color: slate.pageDark }],
+    },
+  ],
+  surface: [
+    {
+      type: 'linear-gradient',
+      direction: 'to bottom left',
+      colorStops: [{ color: slate.surfaceLight }, { color: slate.surfaceDark }],
+    },
+  ],
+  accent: [
+    {
+      type: 'linear-gradient',
+      direction: 'to bottom left',
+      colorStops: [{ color: hue.emberLight }, { color: hue.emberDark }],
+    },
+  ],
 };
 
 /**

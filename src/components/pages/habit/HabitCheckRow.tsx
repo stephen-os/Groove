@@ -1,28 +1,29 @@
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { HabitFace } from '@/components/pages/habit/HabitFace';
 import { Bubble } from '@/components/ui/Bubble';
 import { Card } from '@/components/ui/Card';
 import { Text } from '@/components/ui/Text';
-import { colors, depth, MIN_TOUCH_TARGET, radius, spacing } from '@/lib/theme';
+import { colors, depth, gradients, radius, spacing } from '@/lib/theme';
 
 // One habit on one day, in three states: done, skipped, or neither.
 //
-// Reading order is icon, name, then the control that changes it — the tick sits
-// on the right, where a thumb reaches it and where the eye arrives last, after
-// it already knows what it is agreeing to.
+// The whole row ticks it. The face on the left is the habit's own — a glyph or
+// an emoji it was given — and the box on the right is the state, where a thumb
+// reaches it and where the eye arrives after it already knows what it is
+// agreeing to.
 //
-// Skipping is opting out of that opportunity: it silences the reminder and
-// leaves the denominator, so a day you were ill or away does not read as a
-// failure. It is a separate control from the checkbox because it means
-// something different from "not done yet".
+// Skipping hides behind a long press rather than occupying a second button.
+// It is the rarer action by a wide margin, and giving it equal billing made
+// every row look like it was asking two questions at once.
 
 interface HabitCheckRowProps {
   name: string;
   /** The human-readable schedule, e.g. "Mon Tue Wed Thu". */
   schedule: string;
-  /** Ionicons glyph for the habit's bubble. */
+  /** An Ionicons name or an emoji. */
   icon: string;
-  /** The habit's tint, used for its glyph when it is neither done nor skipped. */
+  /** The habit's tint. Applies to a glyph; an emoji keeps its own colours. */
   tint: string;
   done: boolean;
   skipped: boolean;
@@ -48,56 +49,62 @@ export function HabitCheckRow({
 }: HabitCheckRowProps) {
   const detail = skipped ? 'Skipped' : (pace ?? schedule);
 
+  const askToSkip = (): void => {
+    if (disabled) return;
+    if (skipped) {
+      onSkip();
+      return;
+    }
+    Alert.alert(
+      `Skip ${name} today?`,
+      'It stops asking, and today is left out of your rate rather than counted against it.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Skip today', onPress: onSkip },
+      ]
+    );
+  };
+
   return (
     <Card style={styles.card}>
-      <View style={[styles.row, disabled ? styles.dimmed : null]}>
-        <Bubble accent={done} sunken={skipped}>
-          <Ionicons
-            name={icon as never}
-            size={22}
-            color={done ? colors.onAccent : skipped ? colors.muted : tint}
-          />
+      <Pressable
+        onPress={skipped ? askToSkip : onToggle}
+        onLongPress={askToSkip}
+        disabled={disabled}
+        accessibilityRole="checkbox"
+        accessibilityState={{ checked: done, disabled }}
+        accessibilityLabel={name}
+        accessibilityHint={detail}
+        // Long-press is discoverable by convention but not by sight, so screen
+        // readers get skipping as a named action rather than a gesture.
+        accessibilityActions={[
+          { name: 'longpress', label: skipped ? 'Un-skip' : 'Skip today' },
+        ]}
+        onAccessibilityAction={(event) => {
+          if (event.nativeEvent.actionName === 'longpress') askToSkip();
+        }}
+        style={[styles.row, disabled ? styles.dimmed : null]}
+      >
+        <Bubble sunken={skipped}>
+          <HabitFace icon={icon} tint={skipped ? colors.muted : tint} />
         </Bubble>
 
-        {/* Tapping the label skips, because it is the larger target and the
-            less destructive of the two things this row can do. */}
-        <Pressable
-          onPress={onSkip}
-          disabled={disabled}
-          accessibilityRole="button"
-          accessibilityState={{ selected: skipped, disabled }}
-          accessibilityLabel={skipped ? `Un-skip ${name}` : `Skip ${name}`}
-          accessibilityHint={
-            skipped
-              ? 'Puts this back on the list for today'
-              : 'Opts out of today without counting it against you'
-          }
-          style={styles.labels}
-        >
+        <View style={styles.labels}>
           <Text variant="heading" style={skipped ? styles.struck : undefined}>
             {name}
           </Text>
           <Text variant="caption" tone="muted">
             {detail}
           </Text>
-        </Pressable>
+        </View>
 
-        <Pressable
-          onPress={onToggle}
-          disabled={disabled || skipped}
-          accessibilityRole="checkbox"
-          accessibilityState={{ checked: done, disabled: disabled || skipped }}
-          accessibilityLabel={name}
-          accessibilityHint={detail}
-          style={styles.checkTarget}
-        >
-          <View style={[styles.checkbox, done ? styles.checkboxOn : styles.checkboxOff]}>
-            {/* Decorative: the state is already announced by the checkbox role
-                and the hint, so the glyph must not be read out again. */}
-            {done && <Ionicons name="checkmark" size={20} color={colors.onAccent} />}
-          </View>
-        </Pressable>
-      </View>
+        <View style={[styles.checkbox, done ? styles.checkboxOn : styles.checkboxOff]}>
+          {/* Decorative: the state is already announced by the checkbox role
+              and the hint, so the glyph must not be read out again. */}
+          {done && <Ionicons name="checkmark" size={26} color={colors.onAccent} />}
+          {skipped && <Ionicons name="remove" size={24} color={colors.muted} />}
+        </View>
+      </Pressable>
     </Card>
   );
 }
@@ -108,20 +115,18 @@ const styles = StyleSheet.create({
   dimmed: { opacity: 0.5 },
   labels: { flex: 1, gap: 2 },
   struck: { textDecorationLine: 'line-through' },
-  checkTarget: {
-    width: MIN_TOUCH_TARGET,
-    height: MIN_TOUCH_TARGET,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   checkbox: {
-    width: 30,
-    height: 30,
+    width: 40,
+    height: 40,
     borderRadius: radius.sm,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  checkboxOn: { backgroundColor: colors.accent, boxShadow: depth.raisedSoft },
+  checkboxOn: {
+    backgroundColor: colors.accent,
+    experimental_backgroundImage: gradients.accent,
+    boxShadow: depth.raisedSoft,
+  },
   // Sunken and bordered: the well says "put something here", and the hairline
   // carries the same message at a contrast the shadow alone cannot promise.
   checkboxOff: {

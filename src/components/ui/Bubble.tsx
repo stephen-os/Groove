@@ -1,5 +1,5 @@
 import { StyleSheet, View, type ViewStyle } from 'react-native';
-import { BUBBLE, colors, depth, radius } from '@/lib/theme';
+import { BUBBLE, colors, depth, gradients, radius } from '@/lib/theme';
 
 interface BubbleProps {
   children: React.ReactNode;
@@ -40,9 +40,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  raised: { boxShadow: depth.raisedSoft },
+  raised: { boxShadow: depth.raisedSoft, experimental_backgroundImage: gradients.surface },
   sunken: { backgroundColor: colors.bgAlt, boxShadow: depth.sunken },
   // Keeps the lift shadow so a filled bubble still reads as a physical object
   // rather than a flat sticker.
-  accent: { backgroundColor: colors.accent, boxShadow: depth.raisedSoft },
+  accent: {
+    backgroundColor: colors.accent,
+    boxShadow: depth.raisedSoft,
+    experimental_backgroundImage: gradients.accent,
+  },
 });
