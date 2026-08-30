@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   backupFilename,
   BACKUP_FORMAT_VERSION,
+  MAX_BACKUP_BYTES,
   parseBackup,
   serializeBackup,
+  tooLarge,
 } from '@/lib/backup';
 import type { GrooveData } from '@/lib/db/data';
 
@@ -193,5 +195,32 @@ describe('backupFilename', () => {
 
   it('contains no characters a filesystem or share sheet would object to', () => {
     expect(backupFilename()).toMatch(/^groove-[\d-]+\.json$/);
+  });
+});
+
+
+// The per-field bounds only bite once the file is a string in memory. This is
+// the same ceiling in a form that can be checked before a byte is read.
+describe('tooLarge', () => {
+  it('accepts a file at the limit', () => {
+    expect(tooLarge(MAX_BACKUP_BYTES)).toBe(false);
+  });
+
+  it('rejects one byte over', () => {
+    expect(tooLarge(MAX_BACKUP_BYTES + 1)).toBe(true);
+  });
+
+  it('rejects an absurd file outright', () => {
+    expect(tooLarge(2 * 1024 * 1024 * 1024)).toBe(true);
+  });
+
+  it('accepts an unknown size rather than refusing every vague provider', () => {
+    expect(tooLarge(null)).toBe(false);
+    expect(tooLarge(undefined)).toBe(false);
+  });
+
+  it('leaves room for a maximal legitimate export', () => {
+    // 200,000 completions of indented JSON come to roughly 28MB.
+    expect(MAX_BACKUP_BYTES).toBeGreaterThan(29 * 1024 * 1024);
   });
 });

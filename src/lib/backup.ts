@@ -26,6 +26,30 @@ const MAX_HABITS = 2_000;
 // Ten years of thirty habits ticked every day, with room to spare.
 const MAX_COMPLETIONS = 200_000;
 
+/**
+ * The largest backup file worth opening, in bytes.
+ *
+ * The per-field bounds below only bite once the whole file is a string in
+ * memory, which is far too late to stop a 2GB pick from killing the app — the
+ * exact failure they exist to prevent, defeated by ordering. This is the same
+ * ceiling expressed in something knowable before a single byte is read.
+ *
+ * 32MB sits above a maximal legitimate export: 200,000 completions of indented
+ * JSON come to roughly 28MB, plus a megabyte for habits and profiles.
+ */
+export const MAX_BACKUP_BYTES = 32 * 1024 * 1024;
+
+/**
+ * Whether a file is too large to be a backup this build could have written.
+ *
+ * An unknown size is treated as acceptable rather than rejected: some providers
+ * do not report one, and refusing every file a content provider is vague about
+ * would break importing from perfectly ordinary places.
+ */
+export function tooLarge(bytes: number | null | undefined): boolean {
+  return typeof bytes === 'number' && bytes > MAX_BACKUP_BYTES;
+}
+
 // Epoch milliseconds. Non-negative and finite; `z.number()` alone would accept
 // NaN and Infinity, which SQLite would store as NULL or reject.
 const timestamp = z.number().int().nonnegative();

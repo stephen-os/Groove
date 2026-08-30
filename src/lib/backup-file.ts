@@ -1,6 +1,12 @@
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-import { backupFilename, parseBackup, serializeBackup } from './backup';
+import {
+  backupFilename,
+  MAX_BACKUP_BYTES,
+  parseBackup,
+  serializeBackup,
+  tooLarge,
+} from './backup';
 import { exportData, replaceData } from './db/data';
 
 // The file-system half of backup. Kept apart from backup.ts so the parsing and
@@ -51,8 +57,10 @@ export async function exportBackup(): Promise<BackupOutcome> {
  * Lets the user pick a backup file and replaces the whole database with it.
  *
  * 1. Pick a file. Cancelling is a normal outcome, not an error.
- * 2. Read and validate it — this is the untrusted boundary (see backup.ts).
- * 3. Only once it has fully validated, replace the database contents.
+ * 2. Refuse anything too large to be one of ours, before reading it. Every
+ *    other bound is applied by Zod, which needs the file in memory first.
+ * 3. Read and validate it — this is the untrusted boundary (see backup.ts).
+ * 4. Only once it has fully validated, replace the database contents.
  *
  * Nothing is written until validation passes, so a bad file leaves existing data
  * untouched. The caller is expected to have confirmed with the user first —
@@ -62,6 +70,11 @@ export async function importBackup(): Promise<BackupOutcome> {
   try {
     const picked = await File.pickFileAsync({ mimeTypes: 'application/json' });
     if (picked.canceled) return { ok: false, message: 'Import cancelled.' };
+
+    if (tooLarge(picked.result.size)) {
+      const limit = Math.round(MAX_BACKUP_BYTES / (1024 * 1024));
+      return { ok: false, message: `That file is far too large to be a backup (over ${limit}MB).` };
+    }
 
     const text = await picked.result.text();
     const parsed = parseBackup(text);

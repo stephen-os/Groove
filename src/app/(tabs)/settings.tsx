@@ -121,9 +121,10 @@ export default function SettingsScreen() {
         <Card>
           <Text variant="heading">Backup</Text>
           <Text tone="muted">
-            Everything lives on this device only. Nothing is uploaded anywhere, which also
-            means a lost or wiped phone loses the data — export a backup somewhere safe.
-            The file carries every profile, so it moves the whole app to another phone.
+            Everything lives on this device only. Android&apos;s own app backup is turned
+            off for Groove, so nothing is copied to your Google account either — which
+            also means a lost or wiped phone loses the data. Export a backup somewhere
+            safe. The file carries every profile, so it moves the whole app to a new phone.
           </Text>
 
           <View style={styles.actions}>

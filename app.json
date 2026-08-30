@@ -9,6 +9,7 @@
     "userInterfaceStyle": "dark",
     "android": {
       "package": "com.stephen.groove",
+      "allowBackup": false,
       "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#2c2f35",
