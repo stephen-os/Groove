@@ -43,6 +43,26 @@ export async function completionsBetween(from: DayKey, to: DayKey): Promise<Comp
 }
 
 /**
+ * Every completion a profile has ever recorded.
+ *
+ * The analytics need the lot, not just the window being viewed: a streak is
+ * counted back over the habit's whole life, so a 90-day query would report a
+ * two-year run as ninety days. The volume is small — one row per habit per day
+ * it was done — and it is all local.
+ */
+export async function completionsForProfile(profileId: number): Promise<Completion[]> {
+  const db = await getDatabase();
+  const rows = await db.getAllAsync<CompletionRow>(
+    `SELECT c.id, c.habit_id, c.day, c.done_at
+     FROM completions c
+     JOIN habits h ON h.id = c.habit_id
+     WHERE h.profile_id = ?`,
+    [profileId]
+  );
+  return rows.map(toCompletion);
+}
+
+/**
  * Ticks or un-ticks a habit for one day.
  *
  * `ON CONFLICT DO NOTHING` leans on the unique index rather than reading first:
