@@ -10,8 +10,10 @@ no server, no accounts, no network.
 
 ```
 src/app         routes (expo-router: the file tree IS the navigation)
-src/components  ui/ primitives
-src/lib         theme, date, db/ (schema + access), backup, notifications
+                (tabs)/ Today · History · Analytics · Settings
+src/components  ui/ primitives, pages/ screen-specific
+src/lib         theme, date, schedule, stats, reminder-plan (all pure)
+                db/ (schema + access), backup, notifications, reminders
 plugins         Expo config plugins (release signing)
 tests           Vitest suites for the pure logic
 assets          app icon, splash, adaptive icon
@@ -20,6 +22,20 @@ docs            DEVELOPMENT.md (build and run) · RELEASE.md (ship it)
 
 `src/hooks` and `src/types` don't exist yet — create each when its first occupant
 appears. Import by absolute path (`@/...`).
+
+### Where the logic lives
+
+Four pure modules carry the whole app, and each has a test suite:
+
+- **`date.ts`** — day keys. A habit day is a local calendar day, never a timestamp.
+- **`schedule.ts`** — `habitsDueOn` decides what is due on a given day. Today, the
+  history editor, the analytics denominators and the notification planner all call it.
+- **`stats.ts`** — completion rates, streaks and grades, measured against *scheduled*
+  opportunities rather than calendar days.
+- **`reminder-plan.ts`** — `planAlerts` decides which notifications should exist.
+
+Everything touching SQLite or the notification service is a thin wrapper around these.
+Adding logic to a screen instead of to one of these is how it stops being testable.
 
 ## This app is not shipping
 
