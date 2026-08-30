@@ -1,9 +1,8 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Alert, Pressable, SectionList, StyleSheet, View } from 'react-native';
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { Alert, SectionList, StyleSheet, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { HabitCheckRow } from '@/components/pages/habit/HabitCheckRow';
 import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { fromDayKey, todayKey } from '@/lib/date';
@@ -19,7 +18,7 @@ import {
   monthRange,
   weekRange,
 } from '@/lib/schedule';
-import { colors, MIN_TOUCH_TARGET, radius, spacing } from '@/lib/theme';
+import { spacing } from '@/lib/theme';
 
 interface Row {
   readonly habit: Habit;
@@ -178,39 +177,13 @@ export default function TodayScreen() {
           ) : null
         }
         renderItem={({ item }) => (
-          <Card>
-            <Pressable
-              onPress={() => toggle(item.habit, !item.done)}
-              accessibilityRole="checkbox"
-              accessibilityState={{ checked: item.done }}
-              accessibilityLabel={item.habit.name}
-              accessibilityHint={
-                item.progress
-                  ? `${describeSchedule(item.habit)}, ${item.progress} done`
-                  : describeSchedule(item.habit)
-              }
-              style={styles.row}
-            >
-              <View style={[styles.checkbox, item.done ? styles.checkboxOn : styles.checkboxOff]}>
-                {/* Decorative: the checked state is already announced by the
-                    checkbox role, so the tick must not be read out again. */}
-                {item.done && <Ionicons name="checkmark" size={22} color={colors.onAccent} />}
-              </View>
-
-              <View style={styles.labels}>
-                <Text variant="heading">{item.habit.name}</Text>
-                <Text variant="caption" tone="muted">
-                  {describeSchedule(item.habit)}
-                </Text>
-              </View>
-
-              {item.progress !== undefined && (
-                <Text variant="caption" tone="accent" style={styles.progress}>
-                  {item.progress}
-                </Text>
-              )}
-            </Pressable>
-          </Card>
+          <HabitCheckRow
+            name={item.habit.name}
+            schedule={describeSchedule(item.habit)}
+            done={item.done}
+            progress={item.progress}
+            onToggle={() => toggle(item.habit, !item.done)}
+          />
         )}
       />
 
@@ -228,18 +201,5 @@ const styles = StyleSheet.create({
   date: { marginBottom: spacing.sm },
   section: { marginTop: spacing.sm, letterSpacing: 1 },
   empty: { alignItems: 'center', gap: spacing.xs, paddingVertical: spacing.xl },
-  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  checkbox: {
-    width: MIN_TOUCH_TARGET,
-    height: MIN_TOUCH_TARGET,
-    borderRadius: radius.sm,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  checkboxOn: { backgroundColor: colors.accent, borderColor: colors.accent },
-  checkboxOff: { backgroundColor: 'transparent', borderColor: colors.borderStrong },
-  labels: { flex: 1, gap: spacing.xs },
-  progress: { fontVariant: ['tabular-nums'] },
   newButton: { marginBottom: spacing.md },
 });

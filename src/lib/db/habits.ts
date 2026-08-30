@@ -112,6 +112,21 @@ export async function listArchivedHabits(profileId: number): Promise<Habit[]> {
   return rows.map(toHabit);
 }
 
+/**
+ * Every habit in a profile, archived included.
+ *
+ * The history and the analytics need this: a day three months ago may have had
+ * habits on it that were since retired, and they still have to be nameable.
+ */
+export async function listHabitsWithArchived(profileId: number): Promise<Habit[]> {
+  const db = await getDatabase();
+  const rows = await db.getAllAsync<HabitRow>(
+    `SELECT ${SELECT_COLUMNS} FROM habits WHERE profile_id = ? ORDER BY sort_order, id`,
+    [profileId]
+  );
+  return rows.map(toHabit);
+}
+
 export async function getHabit(id: number): Promise<Habit | null> {
   const db = await getDatabase();
   const row = await db.getFirstAsync<HabitRow>(
