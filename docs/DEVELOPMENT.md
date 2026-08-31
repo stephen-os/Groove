@@ -187,7 +187,16 @@ list and nothing to append to — edit the `CREATE TABLE` directly:
 
 On the next launch the fingerprint in `user_version` no longer matches, so `client.ts`
 deletes the database and rebuilds it from `SCHEMA`. **Everything on the phone is
-erased** — export a backup first if the data matters.
+erased** — but not lost: `writeRescue` runs first and saves the whole contents to
+`Paths.document/rescue/`, which the Settings screen then offers to share and *Restore
+from backup* takes back. Export a backup as well if the data really matters; a rescue
+file is a safety net, not a plan.
+
+Two things follow from that. Native config changes (`app.json`, `plugins/`) need
+`npx expo prebuild --platform android --clean` — a plain prebuild leaves existing
+native resources alone, so a changed splash or icon colour silently does not appear.
+And the demo profile disappears with the rest, which is why the button that adds it
+checks for the profile by name rather than remembering a flag.
 
 Then update the `Habit` interface and row mapping in `src/lib/db/habits.ts`, and — if the
 field should survive a backup — the schema and bounds in `src/lib/backup.ts`.
