@@ -20,6 +20,13 @@ export const SCHEMA: readonly string[] = [
     created_at INTEGER NOT NULL
   )`,
 
+  // NOCASE, not a plain unique index: a switcher offering "Personal" above
+  // "personal" asks you to tell apart two things that read identically, which
+  // is the same failure as allowing the duplicate outright. The name is the
+  // only thing distinguishing one profile from another on that screen, so the
+  // database is the right place to make a second one impossible.
+  `CREATE UNIQUE INDEX idx_profiles_name ON profiles (name COLLATE NOCASE)`,
+
   `CREATE TABLE habits (
     id             INTEGER PRIMARY KEY AUTOINCREMENT,
     profile_id     INTEGER NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,

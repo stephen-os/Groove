@@ -173,6 +173,28 @@ describe('parseBackup referential integrity', () => {
     expectRejected(backup, 'duplicate profiles');
   });
 
+  it('rejects two profiles sharing a name', () => {
+    // Mirrors the unique index on profiles(name). A file describing a state the
+    // database cannot hold is not a file that can be restored, and finding out
+    // mid-restore — after the first profile has already landed — is worse than
+    // refusing it up front.
+    const backup = validBackup();
+    const profiles = backup.profiles as { id: number; name: string; createdAt: number }[];
+    profiles.push({ ...profiles[0], id: profiles[0].id + 1 });
+    expectRejected(backup, 'same name');
+  });
+
+  it('rejects two profile names differing only in case', () => {
+    const backup = validBackup();
+    const profiles = backup.profiles as { id: number; name: string; createdAt: number }[];
+    profiles.push({
+      ...profiles[0],
+      id: profiles[0].id + 1,
+      name: profiles[0].name.toUpperCase(),
+    });
+    expectRejected(backup, 'same name');
+  });
+
   it('rejects duplicate habit ids', () => {
     const backup = validBackup();
     const habits = backup.habits as { id: number }[];
@@ -203,6 +225,16 @@ describe('backupFilename', () => {
 
   it('contains no characters a filesystem or share sheet would object to', () => {
     expect(backupFilename()).toMatch(/^groove-[\d-]+\.json$/);
+    expect(backupFilename(new Date(), 'habits')).toMatch(/^groove-habits-[\d-]+\.json$/);
+  });
+
+  it('tells the three kinds of file apart', () => {
+    // They land in the same downloads folder and are otherwise identical until
+    // you open one: habits alone, one profile with its history, everything.
+    const at = new Date(Date.UTC(2026, 7, 30, 14, 5, 9));
+    expect(backupFilename(at, 'habits')).toBe('groove-habits-2026-08-30-14-05-09.json');
+    expect(backupFilename(at, 'profile')).toBe('groove-profile-2026-08-30-14-05-09.json');
+    expect(backupFilename(at)).toBe('groove-2026-08-30-14-05-09.json');
   });
 });
 

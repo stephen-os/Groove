@@ -1,3 +1,4 @@
+import type { ImportProfile } from '../transfer';
 import { getDatabase } from './client';
 import { toCompletion, type Completion } from './completions';
 import { toHabit, type Habit } from './habits';
@@ -128,4 +129,106 @@ export async function replaceData(data: GrooveData): Promise<void> {
       );
     }
   });
+}
+
+export interface ImportSummary {
+  profiles: number;
+  habits: number;
+  completions: number;
+  /** What the first imported profile ended up called, after de-duplication. */
+  name: string;
+}
+
+/**
+ * Adds imported profiles alongside everything already here.
+ *
+ * The counterpart to `replaceData`, and the opposite promise: nothing existing
+ * is touched. That is not a warning attached to a button, it is the shape of the
+ * operation — an import creates profiles, so there is no existing profile for it
+ * to land in and no merge to get wrong. A regretted import is undone by deleting
+ * the profile it made.
+ *
+ * Ids are assigned by SQLite as it goes and carried down to the rows beneath,
+ * which is why `planImport` hands over a nested plan with the file's own ids
+ * already discarded: nothing here has to renumber anything.
+ *
+ * Names arrive final. Profile names are unique, and choosing a replacement for
+ * one this device already uses is the importer's decision, not a suffix this
+ * function invents — so a clash that reaches here is a bug or a race, and the
+ * unique index answers it by aborting the whole transaction rather than letting
+ * half a profile land.
+ *
+ * Exclusive for the same reason as `replaceData` — picking a file backgrounds
+ * the app, and coming back fires a reminder resync that would otherwise start a
+ * transaction inside this one.
+ */
+export async function importProfiles(plan: readonly ImportProfile[]): Promise<ImportSummary> {
+  const db = await getDatabase();
+  const summary: ImportSummary = { profiles: 0, habits: 0, completions: 0, name: '' };
+
+  await db.withExclusiveTransactionAsync(async (txn) => {
+    let firstId: number | null = null;
+
+    for (const entry of plan) {
+      const name = entry.name;
+      const inserted = await txn.runAsync(
+        'INSERT INTO profiles (name, created_at) VALUES (?, ?)',
+        [name, entry.createdAt]
+      );
+      const profileId = inserted.lastInsertRowId;
+      if (firstId === null) {
+        firstId = profileId;
+        summary.name = name;
+      }
+      summary.profiles += 1;
+
+      for (const habit of entry.habits) {
+        const habitRow = await txn.runAsync(
+          `INSERT INTO habits (
+             profile_id, name, icon, color, schedule_kind,
+             weekday_mask, target_count, due_time, remind_enabled, follow_ups,
+             target_pct, starts_on, archived_at, created_at, updated_at
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            profileId,
+            habit.name,
+            habit.icon,
+            habit.color,
+            habit.scheduleKind,
+            habit.weekdayMask,
+            habit.targetCount,
+            habit.dueTime,
+            habit.remindEnabled ? 1 : 0,
+            habit.followUps,
+            habit.targetPct,
+            habit.startsOn,
+            habit.archivedAt,
+            habit.createdAt,
+            habit.updatedAt,
+          ]
+        );
+        summary.habits += 1;
+
+        for (const done of habit.completions) {
+          await txn.runAsync(
+            'INSERT INTO completions (habit_id, day, status, done_at) VALUES (?, ?, ?, ?)',
+            [habitRow.lastInsertRowId, done.day, done.status, done.doneAt]
+          );
+          summary.completions += 1;
+        }
+      }
+    }
+
+    // Switch to what was just imported. You imported it to look at it, and
+    // landing back on the old profile reads as nothing having happened.
+    if (firstId !== null) {
+      await txn.runAsync(
+        `INSERT INTO settings (key, value) VALUES ('activeProfileId', ?)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+        [String(firstId)]
+      );
+    }
+  });
+
+  return summary;
 }

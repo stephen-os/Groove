@@ -156,6 +156,15 @@ function referentialError(backup: Backup): string | null {
   const habitIds = new Set(backup.habits.map((habit) => habit.id));
 
   if (profileIds.size !== backup.profiles.length) return 'That backup has duplicate profiles.';
+
+  // Mirrors the unique index on profiles(name). Two profiles with one name is
+  // not a state this app has, so a file describing one is not a file it can
+  // restore — and finding out mid-restore, after the first insert has already
+  // landed, is far worse than refusing it here.
+  const names = new Set(backup.profiles.map((profile) => profile.name.trim().toLowerCase()));
+  if (names.size !== backup.profiles.length) {
+    return 'That backup has two profiles with the same name.';
+  }
   if (habitIds.size !== backup.habits.length) return 'That backup has duplicate habits.';
 
   const orphanHabit = backup.habits.find((habit) => !profileIds.has(habit.profileId));
@@ -227,8 +236,14 @@ export function parseBackup(text: string): ParseResult {
   return { ok: true, backup: parsed.data };
 }
 
-/** Timestamped filename, safe on every filesystem — no colons, no spaces. */
-export function backupFilename(now: Date = new Date()): string {
+/**
+ * Timestamped filename, safe on every filesystem — no colons, no spaces.
+ *
+ * `kind` tells the three things the app can write apart. They land in the same
+ * downloads folder and are otherwise indistinguishable until you open one: a
+ * habits-only file, one profile with its history, and a whole-device backup.
+ */
+export function backupFilename(now: Date = new Date(), kind = ''): string {
   const stamp = now.toISOString().slice(0, 19).replace(/[:T]/g, '-');
-  return `groove-${stamp}.json`;
+  return `groove${kind === '' ? '' : `-${kind}`}-${stamp}.json`;
 }

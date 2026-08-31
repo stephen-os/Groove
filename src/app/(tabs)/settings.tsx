@@ -1,6 +1,8 @@
 import { useCallback, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
+import { AccentPicker } from '@/components/pages/settings/AccentPicker';
 import { ProfilePicker } from '@/components/pages/settings/ProfilePicker';
+import { TransferCard } from '@/components/pages/settings/TransferCard';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Screen } from '@/components/ui/Screen';
@@ -16,6 +18,11 @@ export default function SettingsScreen() {
   // miss the result of a backup entirely — the visible text just appears.
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Remounts the profile card after anything on this screen finishes. Importing,
+  // restoring and erasing all change which profiles exist, and all three happen
+  // without ever leaving this route — so nothing else would tell the card to
+  // look again.
+  const [reload, setReload] = useState(0);
 
   const run = useCallback(
     (action: () => Promise<{ ok: boolean; message: string }>): void => {
@@ -27,6 +34,7 @@ export default function SettingsScreen() {
           // so what the OS has pending is no longer trustworthy.
           await syncReminders();
           setStatus(result.message);
+          setReload((n) => n + 1);
         })
         .catch((error: unknown) => {
           console.error('Settings action failed:', error);
@@ -110,13 +118,33 @@ export default function SettingsScreen() {
     <Screen edgeToEdgeBottom>
       <ScrollView contentContainerStyle={styles.content}>
         <Card>
-          <Text variant="heading">Profile</Text>
-          <Text tone="muted">
-            Separate habit lists that share this device — personal and work, say. One is
-            active at a time, and everything else in the app follows it.
+          <Text variant="caption" tone="muted">
+            CURRENT PROFILE
           </Text>
-          <ProfilePicker onChanged={() => setStatus(null)} />
+          <ProfilePicker key={reload} onChanged={() => setStatus(null)} />
+          <Text variant="caption" tone="muted" style={styles.note}>
+            Profiles are separate habit lists sharing this device — personal and work, say.
+            One is active at a time, and every other screen follows it.
+          </Text>
         </Card>
+
+        <Card>
+          <Text variant="heading">Highlight colour</Text>
+          <Text tone="muted">
+            The colour used for anything active — a ticked habit, the chosen day, the line
+            on a chart. Everything else stays the same dark grey.
+          </Text>
+          <AccentPicker />
+        </Card>
+
+        <TransferCard
+          onFinished={() => {
+            // An import creates a profile and switches to it, so the card above
+            // has to look again.
+            setStatus(null);
+            setReload((n) => n + 1);
+          }}
+        />
 
         <Card>
           <Text variant="heading">Backup</Text>
@@ -124,22 +152,17 @@ export default function SettingsScreen() {
             Everything lives on this device only. Android&apos;s own app backup is turned
             off for Groove, so nothing is copied to your Google account either — which
             also means a lost or wiped phone loses the data. Export a backup somewhere
-            safe. The file carries every profile, so it moves the whole app to a new phone.
+            safe: it carries every profile at once, where the exports above carry one.
+            Putting one back is &ldquo;Restore&rdquo;, at the bottom of this screen.
           </Text>
 
           <View style={styles.actions}>
             <Button
               label="Export backup"
+              tone="secondary"
               onPress={() => run(exportBackup)}
               disabled={busy}
-              accessibilityHint="Writes every habit and completed day to a JSON file and opens the share sheet"
-            />
-            <Button
-              label="Restore from backup"
-              tone="secondary"
-              onPress={confirmImport}
-              disabled={busy}
-              accessibilityHint="Replaces all data with the contents of a backup file"
+              accessibilityHint="Writes every profile, habit and completed day to a JSON file and opens the share sheet"
             />
           </View>
 
@@ -182,10 +205,19 @@ export default function SettingsScreen() {
         <Card>
           <Text variant="heading">Start over</Text>
           <Text tone="muted">
-            Neither of these can be undone, and neither touches a backup file you have
-            already exported.
+            None of these can be undone, and none of them touches a file you have already
+            exported. Restore is here rather than beside the other exports because it is
+            the one import that destroys things: it replaces every profile on the device,
+            where importing a profile only ever adds one.
           </Text>
           <View style={styles.actions}>
+            <Button
+              label="Restore from backup"
+              tone="secondary"
+              onPress={confirmImport}
+              disabled={busy}
+              accessibilityHint="Replaces every profile, habit and completed day with the contents of a backup file"
+            />
             <Button
               label="Reset this profile"
               tone="secondary"
@@ -210,4 +242,5 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   content: { paddingHorizontal: GUTTER, gap: spacing.md, paddingVertical: spacing.md },
   actions: { gap: spacing.sm, marginTop: spacing.sm },
+  note: { marginTop: spacing.sm },
 });

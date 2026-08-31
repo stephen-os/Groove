@@ -24,15 +24,6 @@ const toProfile = (row: ProfileRow): Profile => ({
   createdAt: row.created_at,
 });
 
-/** Every profile, oldest first. */
-export async function listProfiles(): Promise<Profile[]> {
-  const db = await getDatabase();
-  const rows = await db.getAllAsync<ProfileRow>(
-    'SELECT id, name, created_at FROM profiles ORDER BY id'
-  );
-  return rows.map(toProfile);
-}
-
 /**
  * The profile the app is currently showing.
  *
@@ -155,4 +146,51 @@ export async function eraseAllData(): Promise<void> {
       [String(result.lastInsertRowId)]
     );
   });
+}
+
+/**
+ * Every profile name currently in use.
+ *
+ * Read before an import so a clash can be put to the user as a question rather
+ * than discovered as a constraint failure half way through writing.
+ */
+export async function profileNames(): Promise<string[]> {
+  const db = await getDatabase();
+  const rows = await db.getAllAsync<{ name: string }>('SELECT name FROM profiles ORDER BY id');
+  return rows.map((row) => row.name);
+}
+
+/** A profile with enough about it to choose between it and another. */
+export interface ProfileSummary extends Profile {
+  /** Active habits — archived ones are history, not part of the setup. */
+  habitCount: number;
+  completionCount: number;
+}
+
+/**
+ * Every profile, with the size of what is inside it.
+ *
+ * A switcher listing bare names asks you to choose without telling you anything
+ * to choose on, which after a couple of imports is a list of near-identical
+ * words. The counts are what make one recognisable as the real one.
+ */
+export async function listProfileSummaries(): Promise<ProfileSummary[]> {
+  const db = await getDatabase();
+  const rows = await db.getAllAsync<
+    ProfileRow & { habit_count: number; completion_count: number }
+  >(
+    `SELECT p.id, p.name, p.created_at,
+            (SELECT COUNT(*) FROM habits h
+              WHERE h.profile_id = p.id AND h.archived_at IS NULL) AS habit_count,
+            (SELECT COUNT(*) FROM completions c
+               JOIN habits h2 ON h2.id = c.habit_id
+              WHERE h2.profile_id = p.id) AS completion_count
+       FROM profiles p
+      ORDER BY p.id`
+  );
+  return rows.map((row) => ({
+    ...toProfile(row),
+    habitCount: row.habit_count,
+    completionCount: row.completion_count,
+  }));
 }
