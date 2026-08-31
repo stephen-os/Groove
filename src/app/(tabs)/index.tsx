@@ -1,9 +1,8 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Alert, Pressable, SectionList, StyleSheet, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import { HabitCheckRow } from '@/components/pages/habit/HabitCheckRow';
-import { Button } from '@/components/ui/Button';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { addDays, formatTime, fromDayKey, todayKey } from '@/lib/date';
@@ -38,7 +37,6 @@ interface Row {
 }
 
 export default function TodayScreen() {
-  const router = useRouter();
   const [habits, setHabits] = useState<Habit[]>([]);
   const [completions, setCompletions] = useState<Completion[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -223,7 +221,7 @@ export default function TodayScreen() {
               </Text>
               <Text tone="muted">
                 {habits.length === 0
-                  ? 'Add the first one to start tracking.'
+                  ? 'Add one on the Habits tab to start tracking.'
                   : readOnly
                     ? 'Nothing was due that day.'
                     : 'Enjoy the day off.'}
@@ -247,11 +245,6 @@ export default function TodayScreen() {
         )}
       />
 
-      <Button
-        label="New habit"
-        onPress={() => router.push('/habit/new')}
-        style={styles.newButton}
-      />
     </Screen>
   );
 }
@@ -281,5 +274,4 @@ const styles = StyleSheet.create({
   section: { letterSpacing: 1.5 },
   rule: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
   empty: { alignItems: 'center', gap: spacing.xs, paddingVertical: spacing.xl },
-  newButton: { marginBottom: spacing.md },
 });

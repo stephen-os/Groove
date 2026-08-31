@@ -103,7 +103,6 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="habit/new" options={{ presentation: 'modal', title: 'New habit' }} />
           <Stack.Screen name="habit/[id]" options={{ presentation: 'modal', title: 'Edit habit' }} />
-          <Stack.Screen name="habits/index" options={{ title: 'Habits' }} />
           <Stack.Screen name="+not-found" options={{ title: 'Not found' }} />
         </Stack>
       </SafeAreaProvider>

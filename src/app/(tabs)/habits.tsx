@@ -19,7 +19,7 @@ import {
 import { habitColor, habitIcon } from '@/lib/habit-style';
 import { getActiveProfileId } from '@/lib/db/profiles';
 import { syncReminders } from '@/lib/reminders';
-import { describeSchedule, groupByDueTime } from '@/lib/schedule';
+import { describeSchedule } from '@/lib/schedule';
 import { GUTTER, MIN_TOUCH_TARGET, colors, spacing } from '@/lib/theme';
 
 export default function ManageHabitsScreen() {
@@ -33,11 +33,11 @@ export default function ManageHabitsScreen() {
       listHabits(profileId),
       listArchivedHabits(profileId),
     ]);
-    // Same order the Today screen uses — earliest due time first, then by name —
-    // so the two screens never disagree about where a habit sits.
-    setActive(groupByDueTime(live.map((habit) => ({ habit }))).flatMap((group) =>
-      group.data.map((row) => row.habit)
-    ));
+    // Alphabetical, not by due time. This is the list you come to when you want
+    // to find a particular habit and change it, and the only order that helps
+    // with that is the one you can predict from its name. Today sorts by when
+    // things are due, because there the question is what happens next.
+    setActive([...live].sort((a, b) => a.name.localeCompare(b.name)));
     setArchived(retired);
   }, []);
 
@@ -113,7 +113,9 @@ export default function ManageHabitsScreen() {
         ListEmptyComponent={
           <View style={styles.empty}>
             <Text variant="heading">No habits yet</Text>
-            <Text tone="muted">Add one to start tracking.</Text>
+            <Text tone="muted">
+              Everything you track lives here — add the first one below.
+            </Text>
           </View>
         }
         renderItem={({ item, section }) => {
@@ -200,5 +202,7 @@ const styles = StyleSheet.create({
   labels: { flex: 1, gap: spacing.xs },
   actions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
   action: { flex: 1 },
-  newButton: { marginBottom: spacing.md },
+  // Margin, not padding: the button sits outside the scrolling list, and its
+  // own shadow needs the same room from the display edge that the cards get.
+  newButton: { marginBottom: spacing.md, marginHorizontal: GUTTER },
 });
