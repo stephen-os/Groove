@@ -2,8 +2,11 @@ import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Button } from '@/components/ui/Button';
+import { Chip } from '@/components/ui/Chip';
 import { Text } from '@/components/ui/Text';
 import { TextField } from '@/components/ui/TextField';
+import { TimeField } from '@/components/ui/TimeField';
+import { Stepper } from '@/components/ui/Stepper';
 import { Bubble } from '@/components/ui/Bubble';
 import { EVERY_DAY, WEEKDAYS } from '@/lib/date';
 import { HabitFace } from '@/components/pages/habit/HabitFace';
@@ -18,17 +21,20 @@ import { GUTTER, MIN_TOUCH_TARGET, bevelRound, colors, depth, radius, spacing } 
 // backup of itself would then reject as invalid.
 const MAX_NAME = 200;
 
-// Same expression the backup schema validates against, so a time this form
-// accepts is a time a backup will too.
-const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
-
+// Short enough that all three sit across one row. The control directly beneath
+// says which is which anyway — 'Weekly' is followed by "How many times a week".
 const KINDS: readonly { readonly kind: ScheduleKind; readonly label: string }[] = [
-  { kind: 'daily', label: 'On set days' },
-  { kind: 'weekly', label: 'Times a week' },
-  { kind: 'monthly', label: 'Times a month' },
+  { kind: 'daily', label: 'Set days' },
+  { kind: 'weekly', label: 'Weekly' },
+  { kind: 'monthly', label: 'Monthly' },
 ];
 
-const COUNTS: readonly number[] = [1, 2, 3, 4, 5, 6, 7];
+// One completion per day is a database constraint, so a week cannot hold more
+// than seven of anything and a month more than thirty-one. Asking for eight a
+// week would be asking to fail.
+const MAX_PER_WEEK = 7;
+const MAX_PER_MONTH = 31;
+
 const TARGETS: readonly number[] = [60, 70, 80, 90, 100];
 
 // What each follow-up count actually means, said in the words a person would
@@ -53,26 +59,23 @@ export const EMPTY_HABIT: HabitInput = {
   targetPct: 80,
 };
 
-// Selection is carried by fill as well as by the state each role announces, so
-// it never rests on colour alone.
-const chipStyle = (selected: boolean) => [styles.chip, selected ? styles.chipOn : styles.chipOff];
-const chipText = (selected: boolean) => (selected ? styles.chipTextOn : styles.chipTextOff);
-
 interface HabitFormProps {
   initial: HabitInput;
   submitLabel: string;
   /** Rejecting shows the message on the form rather than losing what was typed. */
   onSubmit: (input: HabitInput) => Promise<void>;
+  /** Omitted when creating: there is nothing yet to retire. */
+  onArchive?: () => void;
 }
 
-export function HabitForm({ initial, submitLabel, onSubmit }: HabitFormProps) {
+export function HabitForm({ initial, submitLabel, onSubmit, onArchive }: HabitFormProps) {
   const [name, setName] = useState(initial.name);
   const [icon, setIcon] = useState(initial.icon);
   const [color, setColor] = useState(initial.color);
   const [kind, setKind] = useState<ScheduleKind>(initial.scheduleKind);
   const [weekdayMask, setWeekdayMask] = useState(initial.weekdayMask);
   const [targetCount, setTargetCount] = useState(initial.targetCount);
-  const [dueTime, setDueTime] = useState(initial.dueTime ?? '');
+  const [dueTime, setDueTime] = useState<string | null>(initial.dueTime);
   const [remindEnabled, setRemindEnabled] = useState(initial.remindEnabled);
   const [followUps, setFollowUps] = useState(initial.followUps);
   const [targetPct, setTargetPct] = useState(initial.targetPct);
@@ -84,7 +87,6 @@ export function HabitForm({ initial, submitLabel, onSubmit }: HabitFormProps) {
 
   const submit = (): void => {
     const trimmedName = name.trim();
-    const trimmedTime = dueTime.trim();
 
     setNameError(undefined);
     setDayError(undefined);
@@ -102,11 +104,7 @@ export function HabitForm({ initial, submitLabel, onSubmit }: HabitFormProps) {
       setDayError('Pick at least one day.');
       return;
     }
-    if (trimmedTime.length > 0 && !TIME_PATTERN.test(trimmedTime)) {
-      setTimeError('Use a 24-hour time, like 07:00.');
-      return;
-    }
-    if (remindEnabled && trimmedTime.length === 0) {
+    if (remindEnabled && dueTime === null) {
       setTimeError('A reminder needs a time to fire at.');
       return;
     }
@@ -121,8 +119,8 @@ export function HabitForm({ initial, submitLabel, onSubmit }: HabitFormProps) {
       // A daily habit is scheduled by its mask, so a count would be a second
       // source of truth for the same thing. Store the schema's default.
       targetCount: kind === 'daily' ? 1 : targetCount,
-      dueTime: trimmedTime.length === 0 ? null : trimmedTime,
-      remindEnabled: trimmedTime.length === 0 ? false : remindEnabled,
+      dueTime,
+      remindEnabled: dueTime === null ? false : remindEnabled,
       followUps,
       targetPct,
     })
@@ -149,25 +147,26 @@ export function HabitForm({ initial, submitLabel, onSubmit }: HabitFormProps) {
         <Text variant="caption" tone="muted">
           Icon
         </Text>
-        <View style={styles.chips}>
+        {/* Twenty-four emoji and twenty-four glyphs: six to a row, eight full
+            rows, nothing left hanging off the end of the last one. Cells are a
+            fraction of the width rather than a fixed size, so the columns stay
+            square on any display. */}
+        <View style={styles.grid}>
           {[...HABIT_EMOJI, ...HABIT_ICONS].map((option) => {
             const selected = icon === option;
             return (
-              <Pressable
-                key={option}
-                onPress={() => setIcon(option)}
-                accessibilityRole="radio"
-                accessibilityState={{ checked: selected }}
-                accessibilityLabel={option.replace(/-outline$/, '').replace(/-/g, ' ')}
-              >
-                <Bubble accent={selected} size={MIN_TOUCH_TARGET}>
-                  <HabitFace
-                    icon={option}
-                    tint={selected ? colors.onAccent : color}
-                    size={20}
-                  />
-                </Bubble>
-              </Pressable>
+              <View key={option} style={styles.cell6}>
+                <Pressable
+                  onPress={() => setIcon(option)}
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked: selected }}
+                  accessibilityLabel={option.replace(/-outline$/, '').replace(/-/g, ' ')}
+                >
+                  <Bubble accent={selected} size={MIN_TOUCH_TARGET}>
+                    <HabitFace icon={option} tint={selected ? colors.onAccent : color} size={20} />
+                  </Bubble>
+                </Pressable>
+              </View>
             );
           })}
         </View>
@@ -177,22 +176,23 @@ export function HabitForm({ initial, submitLabel, onSubmit }: HabitFormProps) {
         <Text variant="caption" tone="muted">
           Colour
         </Text>
-        <View style={styles.chips}>
+        <View style={styles.grid}>
           {HABIT_COLORS.map((option) => {
             const selected = color === option;
             return (
-              <Pressable
-                key={option}
-                onPress={() => setColor(option)}
-                accessibilityRole="radio"
-                accessibilityState={{ checked: selected }}
-                accessibilityLabel={`Colour ${HABIT_COLORS.indexOf(option) + 1}`}
-                style={[styles.swatch, { backgroundColor: option }]}
-              >
-                {/* A tick rather than a ring, so the choice survives being seen
-                    by someone who cannot separate these hues from each other. */}
-                {selected && <Ionicons name="checkmark" size={20} color={colors.onAccent} />}
-              </Pressable>
+              <View key={option} style={styles.cell4}>
+                <Pressable
+                  onPress={() => setColor(option)}
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked: selected }}
+                  accessibilityLabel={`Colour ${HABIT_COLORS.indexOf(option) + 1}`}
+                  style={[styles.swatch, { backgroundColor: option }]}
+                >
+                  {/* A tick rather than a ring, so the choice survives being
+                      seen by someone who cannot separate these hues. */}
+                  {selected && <Ionicons name="checkmark" size={20} color={colors.onAccent} />}
+                </Pressable>
+              </View>
             );
           })}
         </View>
@@ -202,21 +202,16 @@ export function HabitForm({ initial, submitLabel, onSubmit }: HabitFormProps) {
         <Text variant="caption" tone="muted">
           Schedule
         </Text>
-        <View style={styles.chips}>
-          {KINDS.map((option) => {
-            const selected = kind === option.kind;
-            return (
-              <Pressable
-                key={option.kind}
-                onPress={() => setKind(option.kind)}
-                accessibilityRole="radio"
-                accessibilityState={{ checked: selected }}
-                style={chipStyle(selected)}
-              >
-                <Text style={chipText(selected)}>{option.label}</Text>
-              </Pressable>
-            );
-          })}
+        <View style={styles.row}>
+          {KINDS.map((option) => (
+            <Chip
+              key={option.kind}
+              label={option.label}
+              selected={kind === option.kind}
+              onPress={() => setKind(option.kind)}
+              style={styles.grow}
+            />
+          ))}
         </View>
       </View>
 
@@ -230,97 +225,67 @@ export function HabitForm({ initial, submitLabel, onSubmit }: HabitFormProps) {
               {dayError}
             </Text>
           )}
-          <View style={styles.chips}>
-            {WEEKDAYS.map((weekday) => {
-              const selected = (weekdayMask & (1 << weekday.bit)) !== 0;
-              return (
-                <Pressable
-                  key={weekday.label}
-                  onPress={() => setWeekdayMask((mask) => mask ^ (1 << weekday.bit))}
-                  accessibilityRole="checkbox"
-                  accessibilityState={{ checked: selected }}
-                  accessibilityLabel={weekday.label}
-                  style={chipStyle(selected)}
-                >
-                  <Text style={chipText(selected)}>{weekday.label}</Text>
-                </Pressable>
-              );
-            })}
+          {/* Seven does not divide by four, and a row of seven would put every
+              chip under the 48dp minimum. So the last three are centred beneath
+              the first four rather than left hanging at one edge. */}
+          <View style={styles.wrap}>
+            {WEEKDAYS.map((weekday) => (
+              <Chip
+                key={weekday.label}
+                label={weekday.label}
+                selected={(weekdayMask & (1 << weekday.bit)) !== 0}
+                onPress={() => setWeekdayMask((mask) => mask ^ (1 << weekday.bit))}
+                role="checkbox"
+                style={styles.dayChip}
+              />
+            ))}
           </View>
         </View>
       ) : (
-        <View style={styles.group} accessibilityRole="radiogroup">
-          <Text variant="caption" tone="muted">
-            How many times {kind === 'weekly' ? 'a week' : 'a month'}
-          </Text>
-          <View style={styles.chips}>
-            {COUNTS.map((count) => {
-              const selected = targetCount === count;
-              return (
-                <Pressable
-                  key={count}
-                  onPress={() => setTargetCount(count)}
-                  accessibilityRole="radio"
-                  accessibilityState={{ checked: selected }}
-                  style={chipStyle(selected)}
-                >
-                  <Text style={chipText(selected)}>{String(count)}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
+        <Stepper
+          label={`How many times ${kind === 'weekly' ? 'a week' : 'a month'}`}
+          value={targetCount}
+          onChange={setTargetCount}
+          min={1}
+          max={kind === 'weekly' ? MAX_PER_WEEK : MAX_PER_MONTH}
+          unit={kind === 'weekly' ? 'times a week' : 'times a month'}
+        />
       )}
 
-      <TextField
-        label="Due by (optional, 24-hour)"
-        value={dueTime}
-        onChangeText={setDueTime}
-        error={timeError}
-        placeholder="07:00"
-        maxLength={5}
-        keyboardType="numbers-and-punctuation"
-        autoCapitalize="none"
-      />
+      <TimeField label="Due by" value={dueTime} onChange={setDueTime} error={timeError} />
 
-      <Pressable
+      <Chip
+        label={remindEnabled ? 'Reminders on' : 'Reminders off'}
+        selected={remindEnabled}
         onPress={() => setRemindEnabled((on) => !on)}
-        accessibilityRole="checkbox"
-        accessibilityState={{ checked: remindEnabled }}
+        role="checkbox"
         accessibilityLabel="Remind me if it is not done"
         accessibilityHint="Sends a notification at the due time, then follow-ups until the habit is ticked"
-        style={[styles.toggle, remindEnabled ? styles.chipOn : styles.chipOff]}
-      >
-        <Text style={chipText(remindEnabled)}>
-          {remindEnabled ? 'Reminders on' : 'Reminders off'}
-        </Text>
-      </Pressable>
+      />
 
       {remindEnabled && (
         <View style={styles.group} accessibilityRole="radiogroup">
           <Text variant="caption" tone="muted">
             How much chasing
           </Text>
-          <View style={styles.chips}>
-            {NAGS.map((option) => {
-              const selected = followUps === option.count;
-              return (
-                <Pressable
-                  key={option.count}
-                  onPress={() => setFollowUps(option.count)}
-                  accessibilityRole="radio"
-                  accessibilityState={{ checked: selected }}
-                  accessibilityHint={
-                    option.count === 0
-                      ? 'One notification at the due time and nothing more'
-                      : `Follow-up notifications until the habit is ticked`
-                  }
-                  style={chipStyle(selected)}
-                >
-                  <Text style={chipText(selected)}>{option.label}</Text>
-                </Pressable>
-              );
-            })}
+          {/* Two by two, not four across: '+15/30/60m' needs more width than a
+              quarter of the screen leaves it, and a chip whose label wraps to a
+              second line is taller than the three beside it. */}
+          <View style={styles.pairs}>
+            {NAGS.map((option) => (
+              <Chip
+                key={option.count}
+                label={option.label}
+                selected={followUps === option.count}
+                onPress={() => setFollowUps(option.count)}
+                accessibilityHint={
+                  option.count === 0
+                    ? 'One notification at the due time and nothing more'
+                    : 'Follow-up notifications until the habit is ticked'
+                }
+                style={styles.half}
+              />
+            ))}
           </View>
         </View>
       )}
@@ -329,26 +294,39 @@ export function HabitForm({ initial, submitLabel, onSubmit }: HabitFormProps) {
         <Text variant="caption" tone="muted">
           Target completion rate
         </Text>
-        <View style={styles.chips}>
-          {TARGETS.map((pct) => {
-            const selected = targetPct === pct;
-            return (
-              <Pressable
-                key={pct}
-                onPress={() => setTargetPct(pct)}
-                accessibilityRole="radio"
-                accessibilityState={{ checked: selected }}
-                accessibilityLabel={`${pct} percent`}
-                style={chipStyle(selected)}
-              >
-                <Text style={chipText(selected)}>{`${pct}%`}</Text>
-              </Pressable>
-            );
-          })}
+        <View style={styles.row}>
+          {TARGETS.map((pct) => (
+            <Chip
+              key={pct}
+              label={`${pct}%`}
+              selected={targetPct === pct}
+              onPress={() => setTargetPct(pct)}
+              accessibilityLabel={`${pct} percent`}
+              style={styles.grow}
+            />
+          ))}
         </View>
       </View>
 
       <Button label={saving ? 'Saving…' : submitLabel} onPress={submit} disabled={saving} />
+
+      {/* Retiring a habit is a rare, deliberate act, so it reads as a quiet
+          line at the end of the form rather than competing with Save. It still
+          gets the full 48dp of touch target — inconspicuous is about weight,
+          not about being hard to hit. */}
+      {onArchive !== undefined && (
+        <Pressable
+          onPress={onArchive}
+          accessibilityRole="button"
+          accessibilityHint="Stops it appearing on Today, but keeps its history"
+          style={styles.archive}
+        >
+          <Ionicons name="archive-outline" size={16} color={colors.muted} />
+          <Text variant="caption" tone="muted">
+            Archive this habit
+          </Text>
+        </Pressable>
+      )}
     </ScrollView>
   );
 }
@@ -356,24 +334,21 @@ export function HabitForm({ initial, submitLabel, onSubmit }: HabitFormProps) {
 const styles = StyleSheet.create({
   content: { gap: spacing.md, paddingVertical: spacing.md, paddingHorizontal: GUTTER },
   group: { gap: spacing.xs },
-  chips: { flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' },
-  chip: {
-    minHeight: MIN_TOUCH_TARGET,
-    minWidth: MIN_TOUCH_TARGET,
-    paddingHorizontal: spacing.md,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  toggle: {
-    minHeight: MIN_TOUCH_TARGET,
-    paddingHorizontal: spacing.md,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  // Every group of choices fills its rows. Forty-three faces in columns of six
+  // left one alone on the last line, seven colours left one alone on the
+  // second, and three chips sized to their own labels left a ragged gap at the
+  // right of the schedule row — the form read as a pile of things that had been
+  // dropped rather than laid out.
+  grid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: spacing.sm },
+  cell6: { flexBasis: '16.666%', alignItems: 'center' },
+  cell4: { flexBasis: '25%', alignItems: 'center' },
+  row: { flexDirection: 'row', gap: spacing.sm },
+  grow: { flex: 1, paddingHorizontal: spacing.xs },
+  // The one group that cannot divide evenly, so its remainder is centred.
+  wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, justifyContent: 'center' },
+  pairs: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  half: { flexBasis: '47%', flexGrow: 1 },
+  dayChip: { width: 68 },
   swatch: {
     ...bevelRound,
     // 48, not 44: the app's own minimum, and these are the smallest things on
@@ -385,8 +360,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     boxShadow: depth.raisedSoft,
   },
-  chipOn: { backgroundColor: colors.accent, borderColor: colors.accent },
-  chipOff: { backgroundColor: 'transparent', borderColor: colors.borderStrong },
-  chipTextOn: { color: colors.onAccent },
-  chipTextOff: { color: colors.fg },
+  archive: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    minHeight: MIN_TOUCH_TARGET,
+  },
 });

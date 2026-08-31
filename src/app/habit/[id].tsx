@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
+import { Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { HabitForm } from '@/components/pages/habit/HabitForm';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
-import { getHabit, updateHabit, type Habit, type HabitInput } from '@/lib/db/habits';
+import { archiveHabit, getHabit, updateHabit, type Habit, type HabitInput } from '@/lib/db/habits';
 import { syncReminders } from '@/lib/reminders';
 
 export default function EditHabitScreen() {
@@ -46,6 +47,31 @@ export default function EditHabitScreen() {
     router.back();
   };
 
+  const confirmArchive = (): void => {
+    if (!habit) return;
+    Alert.alert(
+      'Archive habit?',
+      `"${habit.name}" stops appearing on Today, but its history is kept so your statistics stay honest. You can restore it from the Habits list.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Archive',
+          onPress: () => {
+            archiveHabit(habitId)
+              // Archiving is exactly the case the pending alerts must be redrawn
+              // for: the habit is gone from Today but its chain is still armed.
+              .then(syncReminders)
+              .then(() => router.back())
+              .catch((error: unknown) => {
+                console.error('Could not archive habit:', error);
+                Alert.alert('Could not archive that habit.');
+              });
+          },
+        },
+      ]
+    );
+  };
+
   if (missing) {
     return (
       <Screen>
@@ -76,6 +102,7 @@ export default function EditHabitScreen() {
         }}
         submitLabel="Save changes"
         onSubmit={save}
+        onArchive={confirmArchive}
       />
     </Screen>
   );

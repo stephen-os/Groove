@@ -9,7 +9,6 @@ import { Card } from '@/components/ui/Card';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import {
-  archiveHabit,
   deleteHabit,
   listArchivedHabits,
   listHabits,
@@ -61,20 +60,6 @@ export default function ManageHabitsScreen() {
     },
     [load]
   );
-
-  const confirmArchive = (habit: Habit): void => {
-    Alert.alert(
-      'Archive habit?',
-      `"${habit.name}" stops appearing on Today, but its history is kept so your statistics stay honest. You can restore it later.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Archive',
-          onPress: () => run(archiveHabit(habit.id), 'Could not archive that habit.'),
-        },
-      ]
-    );
-  };
 
   const confirmDelete = (habit: Habit): void => {
     Alert.alert(
@@ -152,34 +137,28 @@ export default function ManageHabitsScreen() {
                 )}
               </Pressable>
 
-              <View style={styles.actions}>
-                {isArchived ? (
-                  <>
-                    <Button
-                      label="Restore"
-                      tone="secondary"
-                      onPress={() => run(restoreHabit(item.id), 'Could not restore that habit.')}
-                      accessibilityHint={`Brings ${item.name} back to Today`}
-                      style={styles.action}
-                    />
-                    <Button
-                      label="Delete"
-                      tone="danger"
-                      onPress={() => confirmDelete(item)}
-                      accessibilityHint={`Erases ${item.name} and all its history`}
-                      style={styles.action}
-                    />
-                  </>
-                ) : (
+              {/* Only the archived keep buttons here. An active habit is
+                  edited on its own page, and archiving is one of the things
+                  you do there — a row of controls on every card made the list
+                  hard to read for the sake of an action taken twice a year. */}
+              {isArchived && (
+                <View style={styles.actions}>
                   <Button
-                    label="Archive"
+                    label="Restore"
                     tone="secondary"
-                    onPress={() => confirmArchive(item)}
-                    accessibilityHint={`Retires ${item.name} but keeps its history`}
+                    onPress={() => run(restoreHabit(item.id), 'Could not restore that habit.')}
+                    accessibilityHint={`Brings ${item.name} back to Today`}
                     style={styles.action}
                   />
-                )}
-              </View>
+                  <Button
+                    label="Delete"
+                    tone="danger"
+                    onPress={() => confirmDelete(item)}
+                    accessibilityHint={`Erases ${item.name} and all its history`}
+                    style={styles.action}
+                  />
+                </View>
+              )}
             </Card>
           );
         }}
