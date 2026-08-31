@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { AccentPicker } from '@/components/pages/settings/AccentPicker';
 import { ProfilePicker } from '@/components/pages/settings/ProfilePicker';
+import { RescueCard } from '@/components/pages/settings/RescueCard';
 import { TransferCard } from '@/components/pages/settings/TransferCard';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -136,6 +137,11 @@ export default function SettingsScreen() {
           </Text>
           <AccentPicker />
         </Card>
+
+        {/* Only rendered when the app has rebuilt its own database and saved
+            what it held first. Placed high: it is the most time-sensitive thing
+            on the screen the one time it appears. */}
+        <RescueCard />
 
         <TransferCard
           onFinished={() => {

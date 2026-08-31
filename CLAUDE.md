@@ -48,7 +48,12 @@ and they override the usual instincts:
   database *is*. There is no migration list, because there are no older versions in the
   world. Change a column and `client.ts` rebuilds the database from scratch on the next
   launch — the fingerprint in `user_version` is a content hash, not a version number.
-  Export a backup first if the data in it matters.
+  **`writeRescue` runs first**, saving everything the database held to
+  `Paths.document/rescue/`, which Settings then offers to share; so a rebuild costs a
+  restore rather than the data. It reads the tables defensively rather than through the
+  typed mappers, because it only ever runs when the database no longer matches the code,
+  and it drops whatever would stop `parseBackup` accepting the result — a rescue the
+  Restore button refuses is barely a rescue.
 - **Dead code goes.** If something is not used and will not be used, delete it rather
   than leaving it for later. `npm run deadcode` enforces this for exports; the same rule
   applies to anything it cannot see.

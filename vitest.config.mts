@@ -20,6 +20,7 @@ export default defineConfig({
     alias: {
       '@': path.resolve('src'),
       'expo-sqlite': path.resolve('tests/support/expo-sqlite.ts'),
+      'expo-file-system': path.resolve('tests/support/expo-file-system.ts'),
     },
   },
 });

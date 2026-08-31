@@ -195,6 +195,30 @@ export async function commitImport(
 }
 
 /**
+ * Hands a rescue backup to the share sheet.
+ *
+ * Rescue files are written to the app's own document directory, where nothing
+ * but the app can reach them — so without this they would be a backup that
+ * exists and cannot be retrieved. Sharing is also what lets one be picked back
+ * up by Restore, which reads through the system file picker.
+ */
+export async function shareRescue(uri: string): Promise<BackupOutcome> {
+  try {
+    if (!(await Sharing.isAvailableAsync())) {
+      return { ok: false, message: `Sharing is unavailable on this device. The file is at ${uri}` };
+    }
+    await Sharing.shareAsync(uri, {
+      mimeType: 'application/json',
+      dialogTitle: 'Save rescue backup',
+    });
+    return { ok: true, message: 'Shared.' };
+  } catch (error) {
+    console.error('Could not share the rescue backup:', error);
+    return { ok: false, message: 'Could not share that file.' };
+  }
+}
+
+/**
  * Replaces the entire database with a backup file.
  *
  * The destructive direction, which is why it lives among the other irreversible

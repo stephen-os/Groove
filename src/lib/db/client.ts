@@ -1,4 +1,5 @@
 import { deleteDatabaseAsync, openDatabaseAsync, type SQLiteDatabase } from 'expo-sqlite';
+import { writeRescue } from './rescue';
 import { schemaFingerprint, SCHEMA } from './schema';
 
 const DATABASE_NAME = 'groove.db';
@@ -18,8 +19,15 @@ let connection: Promise<SQLiteDatabase> | null = null;
  * On a mismatch the database file is deleted and recreated rather than altered.
  * That is a deliberate trade for an app still being built: there is no shipped
  * version whose data has to survive, and a database that has silently diverged
- * from the code costs far more to debug than a habit list costs to retype. The
- * export in Settings is there for when the data does matter.
+ * from the code costs far more to debug than a habit list costs to retype.
+ *
+ * What made that trade defensible was that the data was demo data. It stops
+ * being defensible the first day the app is really used: adding one column
+ * would take months of history with it, silently, before the first screen
+ * painted. So the contents are written out first — a rebuild now costs a
+ * restore rather than the data, and `writeRescue` never throws, because an app
+ * that refuses to open because it could not back up a database it was about to
+ * delete anyway is strictly worse than one that opens.
  */
 async function connect(): Promise<SQLiteDatabase> {
   let db = await openDatabaseAsync(DATABASE_NAME);
@@ -28,6 +36,10 @@ async function connect(): Promise<SQLiteDatabase> {
   const row = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
 
   if ((row?.user_version ?? 0) !== expected) {
+    // Before anything is destroyed. Settings surfaces whatever this leaves
+    // behind, so the next launch can offer it back.
+    await writeRescue(db);
+
     // Delete rather than dropping table by table: `PRAGMA foreign_keys` is a
     // no-op inside a transaction, so dropping in place would either fail on the
     // cascades or need the tables ordered by dependency and kept that way.
