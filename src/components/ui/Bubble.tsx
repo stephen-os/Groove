@@ -1,6 +1,6 @@
 import { StyleSheet, View, type ViewStyle } from 'react-native';
 import { Surface } from '@/components/ui/Surface';
-import { BUBBLE, colors, depth, radius } from '@/lib/theme';
+import { bevelRound, BUBBLE, colors, depth, radius } from '@/lib/theme';
 
 interface BubbleProps {
   children: React.ReactNode;
@@ -40,6 +40,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  raised: { boxShadow: depth.raisedSoft },
-  sunken: { backgroundColor: colors.bgAlt, boxShadow: depth.sunken },
+  raised: { ...bevelRound, boxShadow: depth.raisedSoft },
+  sunken: { ...bevelRound, backgroundColor: colors.bgAlt, boxShadow: depth.sunken },
 });

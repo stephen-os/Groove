@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
 import { Surface } from '@/components/ui/Surface';
 import { Text } from '@/components/ui/Text';
-import { colors, depth, MIN_TOUCH_TARGET, radius, spacing } from '@/lib/theme';
+import { bevel, bevelSunken, colors, depth, MIN_TOUCH_TARGET, radius, spacing } from '@/lib/theme';
 
 interface ButtonProps {
   label: string;
@@ -82,8 +82,8 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     justifyContent: 'center',
   },
-  raised: { boxShadow: depth.raised },
-  pressed: { boxShadow: depth.sunken },
+  raised: { ...bevel, boxShadow: depth.raised },
+  pressed: { ...bevelSunken, boxShadow: depth.sunken },
   // The gradient lives on an inner view so the outer one can own the shadow —
   // a shadow and a clipped fill cannot share a node.
   fill: {

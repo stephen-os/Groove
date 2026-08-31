@@ -1,6 +1,6 @@
 import { StyleSheet, View, type ViewStyle } from 'react-native';
 import { Surface } from '@/components/ui/Surface';
-import { colors, depth, radius, spacing } from '@/lib/theme';
+import { bevel, bevelSunken, colors, depth, radius, spacing } from '@/lib/theme';
 
 interface CardProps {
   children: React.ReactNode;
@@ -33,6 +33,6 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     gap: spacing.xs,
   },
-  raised: { boxShadow: depth.raised },
-  sunken: { backgroundColor: colors.bgAlt, boxShadow: depth.sunken },
+  raised: { ...bevel, boxShadow: depth.raised },
+  sunken: { ...bevelSunken, backgroundColor: colors.bgAlt, boxShadow: depth.sunken },
 });

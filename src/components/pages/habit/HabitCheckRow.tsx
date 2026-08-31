@@ -4,7 +4,7 @@ import { HabitFace } from '@/components/pages/habit/HabitFace';
 import { Bubble } from '@/components/ui/Bubble';
 import { Card } from '@/components/ui/Card';
 import { Text } from '@/components/ui/Text';
-import { colors, depth, radius, spacing } from '@/lib/theme';
+import { bevel, bevelSunken, colors, depth, radius, spacing } from '@/lib/theme';
 
 // One habit on one day, in three states: done, skipped, or neither.
 //
@@ -122,12 +122,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  checkboxOn: { backgroundColor: colors.accent, boxShadow: depth.raisedSoft },
+  checkboxOn: { ...bevel, backgroundColor: colors.accent, boxShadow: depth.raisedSoft },
   // Sunken and bordered: the well says "put something here", and the hairline
   // carries the same message at a contrast the shadow alone cannot promise.
   checkboxOff: {
+    ...bevelSunken,
     backgroundColor: colors.bgAlt,
-    borderWidth: StyleSheet.hairlineWidth,
+    // The rim that says "put something here" has to clear WCAG 1.4.11's 3:1,
+    // which the decorative bevel tones do not, so this one border is overridden.
     borderColor: colors.borderStrong,
     boxShadow: depth.sunken,
   },

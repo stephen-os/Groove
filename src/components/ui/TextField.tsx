@@ -1,7 +1,7 @@
 import { useId } from 'react';
 import { StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
 import { Text } from '@/components/ui/Text';
-import { colors, depth, MIN_TOUCH_TARGET, radius, spacing } from '@/lib/theme';
+import { bevelSunken, colors, MIN_TOUCH_TARGET, radius, spacing } from '@/lib/theme';
 
 interface TextFieldProps extends Omit<TextInputProps, 'style'> {
   label: string;
@@ -60,13 +60,14 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   input: {
+    ...bevelSunken,
     minHeight: MIN_TOUCH_TARGET,
     backgroundColor: colors.bgAlt,
-    borderColor: colors.borderStrong,
     color: colors.fg,
     borderRadius: radius.sm,
-    borderWidth: StyleSheet.hairlineWidth,
-    boxShadow: depth.sunken,
+    // No boxShadow here: TextStyle types it as a CSS string, not the array form
+    // a View takes. The inverted bevel already says "pressed in", which is all
+    // the inset shadow was contributing.
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     fontSize: 16,

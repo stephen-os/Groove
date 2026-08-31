@@ -140,34 +140,97 @@ export const GRADIENT_START = { x: 1, y: 0 } as const;
 export const GRADIENT_END = { x: 0, y: 1 } as const;
 
 /**
- * Depth, as paired shadows.
+ * Depth, as a bevelled edge plus a small drop.
  *
- * `raised` lights the top-left and shades the bottom-right, so a surface reads
- * as pressed *out* of the page. `sunken` is the same two shadows inverted and
- * inset, so it reads as pressed *in* — used for inputs, progress tracks, and
- * the moment a button is held down.
+ * The earlier version threw a five-pixel highlight with a twelve-pixel blur
+ * from both corners, which reaches about eleven pixels past the card — further
+ * than the eight-pixel gap between rows, so every card's glow landed on its
+ * neighbour and the list read as one smeared column.
+ *
+ * These stay inside the gap. The edge does the work of separating a surface
+ * from the page — a one-pixel lit rim along the top and a dark one beneath —
+ * and the drop is only deep enough to say which way is up.
  *
  * Typed as `BoxShadowValue[]` rather than a CSS string so the numbers stay
  * numbers and a typo is a type error.
  */
 export const depth: Record<'raised' | 'raisedSoft' | 'sunken' | 'sunkenDeep', BoxShadowValue[]> = {
   raised: [
-    { offsetX: -5, offsetY: -5, blurRadius: 12, color: slate.lift },
-    { offsetX: 5, offsetY: 5, blurRadius: 12, color: slate.shade },
+    { offsetX: 0, offsetY: 2, blurRadius: 5, color: slate.shade },
   ],
-  // For small controls, where a full-size shadow would swamp the element.
+  // For small controls, where even that would swamp the element.
   raisedSoft: [
-    { offsetX: -3, offsetY: -3, blurRadius: 7, color: slate.lift },
-    { offsetX: 3, offsetY: 3, blurRadius: 7, color: slate.shade },
+    { offsetX: 0, offsetY: 1, blurRadius: 3, color: slate.shade },
   ],
   sunken: [
-    { offsetX: -3, offsetY: -3, blurRadius: 7, color: slate.lift, inset: true },
-    { offsetX: 3, offsetY: 3, blurRadius: 7, color: slate.shade, inset: true },
+    { offsetX: 0, offsetY: 1, blurRadius: 3, color: slate.shade, inset: true },
   ],
   sunkenDeep: [
-    { offsetX: -5, offsetY: -5, blurRadius: 10, color: slate.lift, inset: true },
-    { offsetX: 5, offsetY: 5, blurRadius: 10, color: slate.shade, inset: true },
+    { offsetX: 0, offsetY: 2, blurRadius: 5, color: slate.shade, inset: true },
   ],
+};
+
+/**
+ * A bevelled rim: lit along the top, shaded along the bottom.
+ *
+ * One hairline, so it costs nothing and cannot overlap anything. This is what
+ * actually separates a card from the page now — a rim catches the light of a
+ * single overhead source the way a real moulded edge would, where a large blur
+ * only ever reads as a glow around a sticker.
+ *
+ * Sides take a middling tone: a rim lit at the top and shaded at the bottom has
+ * to pass through something in between, and jumping straight from one to the
+ * other makes the corners look notched.
+ *
+ * Typed as its own four properties rather than as `ViewStyle`, so it spreads
+ * into a `TextInput`'s style as happily as a `View`'s — the wider type carries
+ * view-only properties that a text style rejects outright.
+ */
+/**
+ * One device-independent pixel, not `StyleSheet.hairlineWidth`.
+ *
+ * This module must not import a *value* from react-native: it is read by the
+ * Node test suite, which cannot parse react-native's Flow source, and the
+ * contrast assertions are only possible because the palette stays plain data.
+ * A hairline would be finer, but a rim you cannot quite see is not a bevel.
+ */
+const BEVEL_WIDTH = 1;
+
+interface Bevel {
+  readonly borderWidth: number;
+  readonly borderTopColor: string;
+  readonly borderLeftColor: string;
+  readonly borderRightColor: string;
+  readonly borderBottomColor: string;
+}
+
+export const bevel: Bevel = {
+  borderWidth: BEVEL_WIDTH,
+  borderTopColor: slate.lift,
+  borderLeftColor: slate.border,
+  borderRightColor: slate.border,
+  borderBottomColor: slate.shade,
+};
+
+/** The same rim inverted, for anything pressed into the page. */
+export const bevelSunken: Bevel = {
+  borderWidth: BEVEL_WIDTH,
+  borderTopColor: slate.shade,
+  borderLeftColor: slate.border,
+  borderRightColor: slate.border,
+  borderBottomColor: slate.lift,
+};
+
+/**
+ * A single-tone rim, for circles.
+ *
+ * A per-side bevel needs corners to turn on. On a full circle the four colours
+ * meet at arbitrary points on the arc and band visibly, so a bubble takes one
+ * tone all the way round.
+ */
+export const bevelRound: { readonly borderWidth: number; readonly borderColor: string } = {
+  borderWidth: BEVEL_WIDTH,
+  borderColor: slate.border,
 };
 
 /** 4pt grid. Use these rather than raw numbers so rhythm stays consistent. */
