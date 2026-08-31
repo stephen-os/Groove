@@ -1,0 +1,37 @@
+name: verify
+
+# The same gate the repository uses locally. `npm run verify` is one script
+# rather than five steps on purpose: the workflow cannot then drift from what a
+# contributor runs before pushing, which is the usual way CI starts disagreeing
+# with the machine it is meant to represent.
+#
+# It does not build the Android app. That needs the SDK and about ten minutes,
+# and is tracked separately — see the note in README.md: green here means the
+# JavaScript is sound and the config is valid, not that the app runs.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # From .nvmrc, so the version lives in one place.
+          node-version-file: .nvmrc
+          cache: npm
+
+      # `ci`, not `install`: it installs exactly the lockfile and fails if
+      # package.json and package-lock.json have drifted apart.
+      - run: npm ci
+
+      # test -> typecheck -> lint -> deadcode -> secrets
+      - run: npm run verify
