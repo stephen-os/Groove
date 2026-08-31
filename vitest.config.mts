@@ -21,6 +21,8 @@ export default defineConfig({
       '@': path.resolve('src'),
       'expo-sqlite': path.resolve('tests/support/expo-sqlite.ts'),
       'expo-file-system': path.resolve('tests/support/expo-file-system.ts'),
+      'expo-notifications': path.resolve('tests/support/expo-notifications.ts'),
+      'react-native': path.resolve('tests/support/react-native.ts'),
     },
   },
 });

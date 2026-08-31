@@ -101,7 +101,16 @@ export const SCHEMA: readonly string[] = [
     habit_id        INTEGER NOT NULL REFERENCES habits(id) ON DELETE CASCADE,
     day             TEXT    NOT NULL,
     notification_id TEXT    NOT NULL,
-    fire_at         INTEGER NOT NULL
+    fire_at         INTEGER NOT NULL,
+    -- Whether this alert exists because the user tapped Snooze.
+    --
+    -- A resync cancels every pending alert and rebuilds them from the plan, and
+    -- the plan has no idea a snooze was ever asked for - so opening the app
+    -- after snoozing silently destroyed the reminder the user had just asked
+    -- for. Telling the two apart is the only way to put one back, and it cannot
+    -- be inferred afterwards: an alert in the future that the new plan does not
+    -- contain is just as likely to be one the plan deliberately dropped.
+    snoozed         INTEGER NOT NULL DEFAULT 0
   )`,
   `CREATE INDEX idx_notifs_habit_day ON scheduled_notifs (habit_id, day)`,
 

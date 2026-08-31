@@ -6,6 +6,7 @@ import {
   addScheduledNotif,
   forgetNotifsFor,
   notifIdsFor,
+  pendingSnoozes,
   replaceScheduledNotifs,
 } from './db/notifs';
 import { getActiveProfileId } from './db/profiles';
@@ -28,7 +29,7 @@ import { indexCompletions, monthRange, weekRange } from './schedule';
 // module is the part that talks to the notification service.
 
 /**
- * The sync in flight, if any.
+ * The sync in flight, if any, and the one queued behind it.
  *
  * A sync is cancel-everything, schedule, then record. Two overlapping runs
  * interleave into nonsense: the second one's cancel-all wipes the alerts the
@@ -37,9 +38,19 @@ import { indexCompletions, monthRange, weekRange } from './schedule';
  * easy to hit — nine call sites, one of them an AppState listener that fires
  * whenever a share sheet or a file picker closes.
  *
- * Callers join the run already going rather than starting a second one.
+ * So runs are serialised. But joining the run already going is not enough, and
+ * was its own bug: that run read the database *before* the caller wrote to it,
+ * so awaiting it was a guarantee about nothing. `cancelDayChain` leans on
+ * exactly that await to redraw the plan when a tick may have met a target, and
+ * got a promise that resolved without re-reading anything.
+ *
+ * A caller arriving mid-run therefore gets a *follow-up* run, which starts once
+ * the current one has finished and so cannot miss their write. One follow-up is
+ * enough however many callers arrive: they are all asking the same question,
+ * and the answer is whatever the database says once everything has settled.
  */
 let inFlight: Promise<void> | null = null;
+let queued: Promise<void> | null = null;
 
 /**
  * Cancels and re-places every pending alert.
@@ -52,12 +63,24 @@ let inFlight: Promise<void> | null = null;
  * The cheaper path for the common case — ticking a habit — is `cancelDayChain`,
  * which touches only that day's alerts.
  */
-export async function syncReminders(): Promise<void> {
-  if (inFlight) return inFlight;
-  inFlight = runSync().finally(() => {
-    inFlight = null;
+export function syncReminders(): Promise<void> {
+  if (!inFlight) {
+    inFlight = runSync().finally(() => {
+      inFlight = null;
+    });
+    return inFlight;
+  }
+
+  queued ??= inFlight.then(() => {
+    // Cleared before starting, so a caller arriving from here on queues the
+    // next one rather than joining a run that has already begun reading.
+    queued = null;
+    inFlight = runSync().finally(() => {
+      inFlight = null;
+    });
+    return inFlight;
   });
-  return inFlight;
+  return queued;
 }
 
 async function runSync(): Promise<void> {
@@ -97,11 +120,22 @@ async function runSync(): Promise<void> {
       ends.reduce((a, b) => (a > b ? a : b))
     );
 
-    const plan = planAlerts(habits, indexCompletions(completions), new Date());
+    const index = indexCompletions(completions);
+    const plan = planAlerts(habits, index, new Date());
+
+    // Read before anything is torn down. These are alerts the user asked for by
+    // hand, and the plan cannot recreate them.
+    const snoozes = await pendingSnoozes(Date.now());
 
     await cancelAllAlerts();
 
-    const placed: { habitId: number; day: string; notificationId: string; fireAt: number }[] = [];
+    const placed: {
+      habitId: number;
+      day: string;
+      notificationId: string;
+      fireAt: number;
+      snoozed?: boolean;
+    }[] = [];
     for (const alert of plan) {
       const id = await scheduleAlert(alert.title, alert.body, new Date(alert.fireAt), {
         habitId: alert.habitId,
@@ -115,6 +149,31 @@ async function runSync(): Promise<void> {
           day: alert.day,
           notificationId: id,
           fireAt: alert.fireAt,
+        });
+      }
+    }
+
+    // Put the snoozes back. Dropped rather than restored when the habit has
+    // since been acted on — a snooze is "remind me again", not "remind me even
+    // if I have done it".
+    for (const snooze of snoozes) {
+      const habit = habits.find((entry) => entry.id === snooze.habitId);
+      if (!habit) continue;
+      if (index.get(snooze.habitId)?.get(snooze.day) !== undefined) continue;
+
+      const id = await scheduleAlert(
+        `Still: ${habit.name}`,
+        'Snoozed',
+        new Date(snooze.fireAt),
+        { habitId: snooze.habitId, day: snooze.day }
+      );
+      if (id !== null) {
+        placed.push({
+          habitId: snooze.habitId,
+          day: snooze.day,
+          notificationId: id,
+          fireAt: snooze.fireAt,
+          snoozed: true,
         });
       }
     }
@@ -142,6 +201,14 @@ async function runSync(): Promise<void> {
  */
 export async function cancelDayChain(habitId: number, day: string): Promise<void> {
   try {
+    // Never mid-sync. A sync cancels every alert with the OS and only rewrites
+    // `scheduled_notifs` at the end, so in between the table names ids that no
+    // longer exist. Cancelling those succeeds and achieves nothing — the real
+    // alerts are then placed *after* this ran, and nothing is left that could
+    // ever cancel them, so a habit ticked in that window keeps being chased all
+    // day. Waiting costs one sync and removes the window entirely.
+    if (inFlight) await inFlight;
+
     const ids = await notifIdsFor(habitId, day);
     if (ids.length > 0) {
       await cancelAlerts(ids);
@@ -174,12 +241,15 @@ async function snooze(payload: ReminderPayload): Promise<void> {
   if (id === null) return;
 
   // Appended, not replaced: the snoozed alert joins the rest of the day's chain
-  // so that ticking the habit later cancels this one too.
+  // so that ticking the habit later cancels this one too. Flagged, so the next
+  // resync can tell it apart from an alert the plan produced and put it back
+  // rather than quietly destroying it.
   await addScheduledNotif({
     habitId: payload.habitId,
     day: payload.day,
     notificationId: id,
     fireAt: fireAt.getTime(),
+    snoozed: true,
   });
 }
 
