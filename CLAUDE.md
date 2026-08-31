@@ -102,6 +102,12 @@ just read. Several of these look correct and fail at runtime.
   is a display concern and lives in `WEEKDAYS`, not in storage.
 - **Habits archive, they don't delete.** `archived_at` keeps their history in the
   statistics.
+- **Demo data is its own profile, never the one you are in.** `seedDemoData` creates the
+  `Demo` profile and refuses if one exists — checked by name rather than a stored flag,
+  so a database rebuild takes the profile and the answer together, and deleting it
+  re-enables the button with nothing having to remember. Its habits are never
+  `remind_enabled`: they carry due times so Today has more than one time group, and
+  arming them spent Android's one-shot permission prompt on invented habits.
 - **`ON DELETE CASCADE` does not fire inside `withExclusiveTransactionAsync`.**
   expo-sqlite runs those on a second connection it opens itself and never sets
   `foreign_keys` on, and SQLite defaults that pragma OFF per connection — so
@@ -186,6 +192,13 @@ The web rules don't translate directly; these are the mobile equivalents.
 - All colour lives in `src/lib/theme.ts`. No hex values in components.
 - `border` is decorative; **`borderStrong` is for control boundaries** and is the only
   one that meets the 3:1 of WCAG 1.4.11.
+- **`borderColor` cannot override a bevel — use `borderAll(colour)`.** React Native
+  resolves each edge as `edgeColors[LEFT] ?: edgeColors[HORIZONTAL] ?: edgeColors[ALL]`
+  (BorderColors.kt), and `borderColor` only sets ALL, so a spread `bevel`/`bevelSunken`
+  wins whatever the declaration order. Layering `borderColor` over one is dead code that
+  reads as if it works: it cost an input whose error border never turned red, the same
+  in the time picker, a selected profile row that never showed its accent, and a
+  checkbox whose comment claimed to be meeting 1.4.11 while it quietly failed.
 - `onAccent` is the text colour *on* the accent fill — on a light accent it's dark.
 - Contrast is asserted in `tests/lib/theme.test.ts`, including against `bgAlt`, which is
   the tightest pairing and the one an input border uses. **Every accent is asserted

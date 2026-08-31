@@ -1,7 +1,7 @@
 import { useId } from 'react';
 import { StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
 import { Text } from '@/components/ui/Text';
-import { bevelSunken, colors, MIN_TOUCH_TARGET, radius, spacing } from '@/lib/theme';
+import { borderAll, bevelSunken, colors, MIN_TOUCH_TARGET, radius, spacing } from '@/lib/theme';
 
 interface TextFieldProps extends Omit<TextInputProps, 'style'> {
   label: string;
@@ -72,10 +72,10 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     fontSize: 16,
   },
-  inputError: {
-    borderColor: colors.error,
-    borderWidth: 1,
-  },
+  // Every edge, not `borderColor`: the sunken bevel above sets each edge
+  // individually and those always win, so the red border simply never appeared
+  // and the message below was the only sign anything was wrong.
+  inputError: borderAll(colors.error),
   multiline: {
     minHeight: MIN_TOUCH_TARGET * 2,
     textAlignVertical: 'top',

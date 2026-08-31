@@ -1,6 +1,7 @@
 import { addDays, maskIncludes, todayKey } from '../date';
+import { isNameTaken } from '../transfer';
 import { getDatabase } from './client';
-import { getActiveProfileId } from './profiles';
+import { profileNames } from './profiles';
 
 // Demo data, for looking at screens that need a history to say anything.
 //
@@ -10,6 +11,30 @@ import { getActiveProfileId } from './profiles';
 //
 // It is deterministic: the same ninety days every time, so a screenshot taken
 // today can be compared with one taken after a change. Nothing here is random.
+//
+// It arrives as its own profile rather than replacing the one you are in. That
+// used to erase every real habit you had, which made a button labelled "demo
+// data" one of the most destructive things on the screen; now it adds something
+// you can look at and then delete, like any other profile.
+
+/** The profile demo data lands in. Its existence is what "enabled" means. */
+export const DEMO_PROFILE = 'Demo';
+
+/**
+ * Whether the demo profile is already here.
+ *
+ * Answered by name rather than by a stored flag, which keeps it honest through
+ * the things that a flag would get wrong: the database being rebuilt from
+ * scratch after a schema change takes the profile and the answer together, and
+ * deleting or renaming the profile re-enables the button without anything
+ * having to remember to. If someone has made their own profile called Demo,
+ * this reports true and the button greys out — which is the safe way round,
+ * because the alternative is writing ninety days of invented history into a
+ * profile they built themselves.
+ */
+export async function demoProfileExists(): Promise<boolean> {
+  return isNameTaken(DEMO_PROFILE, await profileNames());
+}
 
 const DAYS = 90;
 
@@ -80,7 +105,8 @@ function jitter(index: number, offset: number): number {
  */
 export async function seedDemoData(): Promise<{ habits: number; completions: number }> {
   const db = await getDatabase();
-  const profileId = await getActiveProfileId();
+  if (await demoProfileExists()) return { habits: 0, completions: 0 };
+
   const today = todayKey();
   const start = addDays(today, -(DAYS - 1));
   const now = Date.now();
@@ -88,7 +114,11 @@ export async function seedDemoData(): Promise<{ habits: number; completions: num
   let completions = 0;
 
   await db.withExclusiveTransactionAsync(async (txn) => {
-    await txn.runAsync('DELETE FROM habits WHERE profile_id = ?', [profileId]);
+    const created = await txn.runAsync('INSERT INTO profiles (name, created_at) VALUES (?, ?)', [
+      DEMO_PROFILE,
+      now,
+    ]);
+    const profileId = created.lastInsertRowId;
 
     for (const [index, template] of TEMPLATES.entries()) {
       const result = await txn.runAsync(
@@ -106,7 +136,14 @@ export async function seedDemoData(): Promise<{ habits: number; completions: num
           template.weekdayMask,
           template.targetCount,
           template.dueTime,
-          template.dueTime === null ? 0 : 1,
+          // Never armed. Demo habits carry due times so the Today screen has
+          // more than one time group, and switching reminders on for them meant
+          // pressing this button spent Android's one-shot permission prompt on
+          // invented habits — and, if granted, started nagging at 07:00 the next
+          // morning about brushing teeth that were never real. Declining is
+          // worse still: `canAskAgain` is false for good, so real reminders
+          // could then never be enabled without a trip to system settings.
+          0,
           template.followUps,
           template.targetPct,
           start,
@@ -164,6 +201,14 @@ export async function seedDemoData(): Promise<{ habits: number; completions: num
         }
       }
     }
+
+    // Switch to it, because the only reason to press the button is to look at
+    // it. Coming back to your own profile reads as nothing having happened.
+    await txn.runAsync(
+      `INSERT INTO settings (key, value) VALUES ('activeProfileId', ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+      [String(profileId)]
+    );
   });
 
   return { habits: TEMPLATES.length, completions };

@@ -17,7 +17,7 @@ import {
 } from '@/lib/db/profiles';
 import { syncReminders } from '@/lib/reminders';
 import { isNameTaken } from '@/lib/transfer';
-import { bevelSunken, colors, MIN_TOUCH_TARGET, radius, spacing } from '@/lib/theme';
+import { borderAll, bevelSunken, colors, MIN_TOUCH_TARGET, radius, spacing } from '@/lib/theme';
 
 // Switching between separate habit lists — personal and work — without any
 // notion of an account. Keep in step with the bound in lib/backup.ts.
@@ -150,7 +150,7 @@ export function ProfilePicker({ onChanged }: { onChanged: () => void }) {
                 accessibilityState={{ checked: selected }}
                 accessibilityLabel={profile.name}
                 accessibilityHint={describe(profile)}
-                style={[styles.row, selected ? { borderColor: accent.base } : null]}
+                style={[styles.row, selected ? borderAll(accent.base) : null]}
               >
                 <View style={styles.rowLabels}>
                   <Text>{profile.name}</Text>
@@ -256,7 +256,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.sm,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    borderColor: colors.borderStrong,
+    ...borderAll(colors.borderStrong),
   },
   rowLabels: { flex: 1, gap: 2 },
   editor: { gap: spacing.sm, marginTop: spacing.sm },

@@ -99,6 +99,44 @@ export async function exportBackup(): Promise<BackupOutcome> {
 }
 
 /**
+ * Whether a picked file is small enough to read into memory.
+ *
+ * `File.size` is documented as **0** when a file cannot be read — not null, the
+ * way `Directory.size` is — so `tooLarge` waved through exactly the case it was
+ * written for: several Android file managers and some Drive-backed pickers do
+ * not populate a size, and every one of them skipped the bound entirely and
+ * went straight to reading the whole thing.
+ *
+ * When the size is unknown the file is measured a chunk at a time and abandoned
+ * the moment it goes over, so nothing larger than the limit is ever held whole.
+ * The extra pass costs a read of a file already known to be small.
+ */
+async function withinBounds(file: File): Promise<boolean> {
+  if (file.size > 0) return !tooLarge(file.size);
+
+  try {
+    const reader = file.readableStream().getReader();
+    let total = 0;
+    try {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) return true;
+        total += value.byteLength;
+        if (total > MAX_BACKUP_BYTES) return false;
+      }
+    } finally {
+      await reader.cancel().catch(() => undefined);
+    }
+  } catch (error) {
+    // Streaming is not available for this file. That leaves us exactly where
+    // this function found things, which is worse than measuring and better than
+    // refusing every import the moment one provider behaves unusually.
+    console.warn('Could not measure the picked file:', error);
+    return true;
+  }
+}
+
+/**
  * Picks a file and reads it, then hands back what it contained.
  *
  * The untrusted boundary, and the order of the steps is the point:
@@ -115,7 +153,7 @@ async function readPickedFile(): Promise<
   const picked = await File.pickFileAsync({ mimeTypes: 'application/json' });
   if (picked.canceled) return { ok: false, message: 'Cancelled.' };
 
-  if (tooLarge(picked.result.size)) {
+  if (!(await withinBounds(picked.result))) {
     const limit = Math.round(MAX_BACKUP_BYTES / (1024 * 1024));
     return {
       ok: false,

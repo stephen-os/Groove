@@ -4,7 +4,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Chip } from '@/components/ui/Chip';
 import { Text } from '@/components/ui/Text';
 import { formatTime } from '@/lib/date';
-import { bevelSunken, colors, MIN_TOUCH_TARGET, radius, spacing } from '@/lib/theme';
+import { borderAll, bevelSunken, colors, MIN_TOUCH_TARGET, radius, spacing } from '@/lib/theme';
 
 // Quarter hours. Ninety-six entries in one list is a scroll you have to aim at;
 // as an hour and then a quarter it is two taps and nothing moves under you.
@@ -128,7 +128,8 @@ const styles = StyleSheet.create({
     borderRadius: radius.sm,
     paddingHorizontal: spacing.md,
   },
-  fieldError: { borderColor: colors.error, borderWidth: 1 },
+  // See TextField: a per-edge bevel beats `borderColor`, so this had no effect.
+  fieldError: borderAll(colors.error),
   placeholder: { color: colors.muted },
   picker: { gap: spacing.sm, paddingTop: spacing.xs },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },

@@ -5,7 +5,7 @@ import { Bubble } from '@/components/ui/Bubble';
 import { Card } from '@/components/ui/Card';
 import { Text } from '@/components/ui/Text';
 import { useAccent } from '@/hooks/useAccent';
-import { bevelSunken, colors, depth, radius, spacing } from '@/lib/theme';
+import { borderAll, bevelSunken, colors, depth, radius, spacing } from '@/lib/theme';
 
 // One habit on one day, in three states: done, skipped, or neither.
 //
@@ -137,8 +137,11 @@ const styles = StyleSheet.create({
     ...bevelSunken,
     backgroundColor: colors.bgAlt,
     // The rim that says "put something here" has to clear WCAG 1.4.11's 3:1,
-    // which the decorative bevel tones do not, so this one border is overridden.
-    borderColor: colors.borderStrong,
+    // which the decorative bevel tones do not, so this one border is overridden
+    // on every edge. `borderColor` alone could not do it: a per-edge bevel beats
+    // the shorthand whatever the order, so the override was silently ignored and
+    // every unticked checkbox kept a rim that fails the bar.
+    ...borderAll(colors.borderStrong),
     boxShadow: depth.sunken,
   },
 });

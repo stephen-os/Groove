@@ -40,11 +40,14 @@ const MAX_COMPLETIONS = 200_000;
 export const MAX_BACKUP_BYTES = 32 * 1024 * 1024;
 
 /**
- * Whether a file is too large to be a backup this build could have written.
+ * Whether a known size is too large to be a backup this build could have written.
  *
- * An unknown size is treated as acceptable rather than rejected: some providers
- * do not report one, and refusing every file a content provider is vague about
- * would break importing from perfectly ordinary places.
+ * Null means the platform would not say, and is treated as acceptable rather
+ * than rejected: some providers do not report a size, and refusing every file a
+ * content provider is vague about would break importing from perfectly ordinary
+ * places. The caller is expected to measure those another way — see
+ * `withinBounds` in backup-file.ts — because "unknown" is exactly the case a
+ * pre-read bound has to cover and the one it silently used to wave through.
  */
 export function tooLarge(bytes: number | null | undefined): boolean {
   return typeof bytes === 'number' && bytes > MAX_BACKUP_BYTES;

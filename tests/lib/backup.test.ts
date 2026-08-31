@@ -255,8 +255,18 @@ describe('tooLarge', () => {
   });
 
   it('accepts an unknown size rather than refusing every vague provider', () => {
+    // Null is "the platform would not say". `File.size` reports that as 0, not
+    // null, which is why the caller maps it before asking — measuring an
+    // unknown-size file is `withinBounds`'s job, not this predicate's.
     expect(tooLarge(null)).toBe(false);
     expect(tooLarge(undefined)).toBe(false);
+  });
+
+  it('does not mistake a reported zero for a small file', () => {
+    // Zero is a real answer here and means an empty file, which is under the
+    // limit. The trap is upstream: expo reports "cannot be read" as 0 too, so a
+    // caller passing `File.size` straight in asks the wrong question.
+    expect(tooLarge(0)).toBe(false);
   });
 
   it('leaves room for a maximal legitimate export', () => {

@@ -260,6 +260,28 @@ function bevelOf(light: string, dark: string): Bevel {
 }
 
 export const bevelDanger = bevelOf(hue.roseLight, hue.roseDark);
+
+/**
+ * One colour on all four edges, for overriding a bevel.
+ *
+ * `borderColor` cannot do this, whatever the order. React Native resolves each
+ * edge as `edgeColors[LEFT] ?: edgeColors[HORIZONTAL] ?: edgeColors[ALL]`
+ * (BorderColors.kt), and `borderColor` only ever sets ALL — so a per-edge bevel
+ * spread into the same style always wins, and the `borderColor` layered over it
+ * is dead code that reads as if it works. That cost an input whose validation
+ * border never turned red, a time field the same, a selected profile row that
+ * never showed its accent, and a checkbox whose comment claimed to be meeting
+ * WCAG 1.4.11 while it kept the decorative bevel tones that do not.
+ */
+export function borderAll(color: string): Bevel {
+  return {
+    borderWidth: BEVEL_WIDTH,
+    borderTopColor: color,
+    borderLeftColor: color,
+    borderRightColor: color,
+    borderBottomColor: color,
+  };
+}
 // Light and shade swapped, for the pressed state. A filled button's inset
 // shadow is nearly invisible against a bright fill, so the rim is what has to
 // carry the press — and it carries it without relying on colour.

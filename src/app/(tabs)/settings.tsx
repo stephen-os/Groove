@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { AccentPicker } from '@/components/pages/settings/AccentPicker';
+import { DemoCard } from '@/components/pages/settings/DemoCard';
 import { ProfilePicker } from '@/components/pages/settings/ProfilePicker';
 import { RescueCard } from '@/components/pages/settings/RescueCard';
 import { TransferCard } from '@/components/pages/settings/TransferCard';
@@ -10,7 +11,6 @@ import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { exportBackup, importBackup } from '@/lib/backup-file';
 import { eraseAllData, getActiveProfileId, resetProfile } from '@/lib/db/profiles';
-import { seedDemoData } from '@/lib/db/seed';
 import { syncReminders } from '@/lib/reminders';
 import { GUTTER, spacing } from '@/lib/theme';
 
@@ -53,25 +53,6 @@ export default function SettingsScreen() {
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Replace', style: 'destructive', onPress: () => run(importBackup) },
-      ]
-    );
-  };
-
-  const confirmSeed = (): void => {
-    Alert.alert(
-      'Replace with demo data?',
-      'Every habit in this profile and its history are erased and replaced with ninety days of made-up history. It cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Seed',
-          style: 'destructive',
-          onPress: () =>
-            run(async () => {
-              const { habits, completions } = await seedDemoData();
-              return { ok: true, message: `Seeded ${habits} habits and ${completions} days.` };
-            }),
-        },
       ]
     );
   };
@@ -190,23 +171,12 @@ export default function SettingsScreen() {
           </Text>
         </Card>
 
-        <Card>
-          <Text variant="heading">Demo data</Text>
-          <Text tone="muted">
-            Replaces this profile with nine habits and a worked ninety-day history, so the
-            calendar and the analytics have something to show. The same ninety days every
-            time, so screenshots stay comparable.
-          </Text>
-          <View style={styles.actions}>
-            <Button
-              label="Seed 90 days"
-              tone="secondary"
-              onPress={confirmSeed}
-              disabled={busy}
-              accessibilityHint="Erases this profile's habits and fills it with demo history"
-            />
-          </View>
-        </Card>
+        <DemoCard
+          onFinished={() => {
+            setStatus(null);
+            setReload((n) => n + 1);
+          }}
+        />
 
         <Card>
           <Text variant="heading">Start over</Text>
