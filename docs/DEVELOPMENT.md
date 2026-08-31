@@ -2,11 +2,11 @@
 
 Getting from a fresh clone to the app running on your own Android phone, on Windows.
 
-> **What has and hasn't been verified.** The JavaScript side of this template —
-> types, lint, tests, dead code, secrets, `expo prebuild`, and `expo-doctor` — was run
-> and is green. The Gradle build was **not**: the machine this template was written on
-> has JDK 17 but no Android SDK. Steps 1–3 below are therefore the parts most likely to
-> need a nudge, and the first `npm run android` is the real proof.
+> **What `npm run verify` does and does not tell you.** It runs the tests, types, lint,
+> dead-code and secret checks, and never compiles the Android app. Green means the
+> JavaScript is sound and the config is valid; only `npm run android` proves the thing
+> builds and runs. Changing `app.json` or anything in `plugins/` needs a prebuild, and
+> the symptom of skipping one is a change that simply doesn't appear.
 
 ---
 
