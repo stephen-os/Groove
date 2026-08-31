@@ -1,5 +1,6 @@
 import { StyleSheet, View, type ViewStyle } from 'react-native';
 import { Surface } from '@/components/ui/Surface';
+import { useAccent } from '@/hooks/useAccent';
 import { bevelRound, BUBBLE, colors, depth, radius } from '@/lib/theme';
 
 interface BubbleProps {
@@ -20,6 +21,7 @@ interface BubbleProps {
  * rows themselves are otherwise identical.
  */
 export function Bubble({ children, sunken = false, accent = false, size = BUBBLE, style }: BubbleProps) {
+  const tint = useAccent();
   const shape = { width: size, height: size, borderRadius: radius.full };
 
   if (sunken) {
@@ -28,7 +30,16 @@ export function Bubble({ children, sunken = false, accent = false, size = BUBBLE
   return (
     <Surface
       ramp={accent ? 'accent' : 'surface'}
-      style={[styles.bubble, shape, styles.raised, style ?? {}]}
+      style={[
+        styles.bubble,
+        shape,
+        styles.raised,
+        // A circle takes one tone all the way round, so an accent bubble takes
+        // the accent's dark end rather than the grey rim, which read as a wire
+        // loop drawn around the fill.
+        accent ? { borderColor: tint.dark } : {},
+        style ?? {},
+      ]}
     >
       {children}
     </Surface>

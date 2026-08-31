@@ -25,6 +25,7 @@ import {
   paceLabel,
   windowFor,
 } from '@/lib/schedule';
+import { useAccent } from '@/hooks/useAccent';
 import { GUTTER, MIN_TOUCH_TARGET, colors, spacing } from '@/lib/theme';
 
 interface Row {
@@ -36,6 +37,7 @@ interface Row {
 }
 
 export default function TodayScreen() {
+  const accent = useAccent();
   const [habits, setHabits] = useState<Habit[]>([]);
   const [completions, setCompletions] = useState<Completion[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -181,7 +183,7 @@ export default function TodayScreen() {
               accessibilityLabel="Previous day"
               style={styles.arrow}
             >
-              <Ionicons name="chevron-back" size={22} color={colors.accent} />
+              <Ionicons name="chevron-back" size={22} color={accent.base} />
             </Pressable>
 
             <Pressable
@@ -205,7 +207,7 @@ export default function TodayScreen() {
                   : 'Today'}
               </Text>
               {readOnly && (
-                <Text variant="caption" tone="accent">
+                <Text variant="caption" style={{ color: accent.base }}>
                   Tap to return to today
                 </Text>
               )}
@@ -217,7 +219,7 @@ export default function TodayScreen() {
               accessibilityLabel="Next day"
               style={styles.arrow}
             >
-              <Ionicons name="chevron-forward" size={22} color={colors.accent} />
+              <Ionicons name="chevron-forward" size={22} color={accent.base} />
             </Pressable>
           </View>
         }

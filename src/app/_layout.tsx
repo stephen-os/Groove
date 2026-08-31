@@ -6,6 +6,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { AccentProvider } from '@/hooks/useAccent';
 import { getDatabase } from '@/lib/db/client';
 import { configureNotifications } from '@/lib/notifications';
 import { handleReminderResponse, syncReminders } from '@/lib/reminders';
@@ -104,18 +105,25 @@ export default function RootLayout() {
       <SafeAreaProvider>
         {/* The app is dark only, so the status bar icons are always light. */}
         <StatusBar style="light" />
-        <Stack
-          screenOptions={{
-            headerStyle: { backgroundColor: colors.bg },
-            headerTintColor: colors.fg,
-            contentStyle: { backgroundColor: colors.bg },
-          }}
-        >
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="habit/new" options={{ presentation: 'modal', title: 'New habit' }} />
-          <Stack.Screen name="habit/[id]" options={{ presentation: 'modal', title: 'Edit habit' }} />
-          <Stack.Screen name="+not-found" options={{ title: 'Not found' }} />
-        </Stack>
+        {/* Outside the navigator, so a change of accent repaints every screen
+            already on the stack rather than only the one in front. */}
+        <AccentProvider>
+          <Stack
+            screenOptions={{
+              headerStyle: { backgroundColor: colors.bg },
+              headerTintColor: colors.fg,
+              contentStyle: { backgroundColor: colors.bg },
+            }}
+          >
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="habit/new" options={{ presentation: 'modal', title: 'New habit' }} />
+            <Stack.Screen
+              name="habit/[id]"
+              options={{ presentation: 'modal', title: 'Edit habit' }}
+            />
+            <Stack.Screen name="+not-found" options={{ title: 'Not found' }} />
+          </Stack>
+        </AccentProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

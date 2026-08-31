@@ -27,6 +27,7 @@ import {
   weekRange,
   windowFor,
 } from '@/lib/schedule';
+import { useAccent } from '@/hooks/useAccent';
 import { GUTTER, MIN_TOUCH_TARGET, colors, radius, spacing } from '@/lib/theme';
 
 // Any past day is editable here. Archived habits are loaded too — a day in
@@ -42,6 +43,7 @@ interface Cell {
 }
 
 export default function HistoryScreen() {
+  const accent = useAccent();
   const today = todayKey();
   const [anchor, setAnchor] = useState(today);
   const [selected, setSelected] = useState(today);
@@ -187,7 +189,7 @@ export default function HistoryScreen() {
             accessibilityLabel="Previous month"
             style={styles.monthButton}
           >
-            <Ionicons name="chevron-back" size={22} color={colors.accent} />
+            <Ionicons name="chevron-back" size={22} color={accent.base} />
           </Pressable>
 
           <Text variant="heading">
@@ -203,7 +205,7 @@ export default function HistoryScreen() {
             accessibilityLabel="Next month"
             style={styles.monthButton}
           >
-            <Ionicons name="chevron-forward" size={22} color={colors.accent} />
+            <Ionicons name="chevron-forward" size={22} color={accent.base} />
           </Pressable>
         </View>
 

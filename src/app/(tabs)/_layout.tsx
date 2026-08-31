@@ -1,18 +1,21 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Tabs } from 'expo-router/js-tabs';
+import { useAccent } from '@/hooks/useAccent';
 import { colors } from '@/lib/theme';
 
 // Imported from 'expo-router/js-tabs', not from 'expo-router'. The root export
 // is deprecated in SDK 57, and 'expo-router/unstable-native-tabs' is — as the
 // name says — unstable. This is the supported, stable path.
 export default function TabsLayout() {
+  const accent = useAccent();
+
   return (
     <Tabs
       screenOptions={{
         headerStyle: { backgroundColor: colors.bg },
         headerTintColor: colors.fg,
         tabBarStyle: { backgroundColor: colors.bgAlt, borderTopColor: colors.border },
-        tabBarActiveTintColor: colors.accent,
+        tabBarActiveTintColor: accent.base,
         tabBarInactiveTintColor: colors.muted,
         sceneStyle: { backgroundColor: colors.bg },
       }}

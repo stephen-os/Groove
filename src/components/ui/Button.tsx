@@ -1,13 +1,24 @@
 import { Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
 import { Surface } from '@/components/ui/Surface';
 import { Text } from '@/components/ui/Text';
-import { bevel, bevelSunken, colors, depth, MIN_TOUCH_TARGET, radius, spacing } from '@/lib/theme';
+import { useAccent } from '@/hooks/useAccent';
+import {
+  bevel,
+  bevelDanger,
+  bevelDangerSunken,
+  bevelSunken,
+  colors,
+  depth,
+  MIN_TOUCH_TARGET,
+  radius,
+  spacing,
+} from '@/lib/theme';
 
 interface ButtonProps {
   label: string;
   onPress: () => void;
   /** 'primary' fills with the accent; 'secondary' is bare; 'danger' is destructive. */
-  tone?: keyof typeof FILLS;
+  tone?: Tone;
   disabled?: boolean;
   /**
    * Longer description for screen readers, when the label alone is ambiguous
@@ -17,13 +28,30 @@ interface ButtonProps {
   style?: ViewStyle;
 }
 
+type Tone = 'primary' | 'secondary' | 'danger';
+
 // Each tone names its own ramp. Leaving danger to fall through to 'surface'
 // painted an opaque grey gradient over the red and made every destructive
 // button unreadable — and, worse, indistinguishable from a safe one.
+//
+// Primary is absent: it is whatever accent is currently chosen, so it cannot be
+// resolved until render. Destructive stays fixed — red is what the action means
+// rather than a matter of taste.
 const FILLS = {
-  primary: { backgroundColor: colors.accent, color: colors.onAccent, ramp: 'accent' },
-  secondary: { backgroundColor: colors.surface, color: colors.fg, ramp: 'surface' },
-  danger: { backgroundColor: colors.error, color: colors.onAccent, ramp: 'danger' },
+  secondary: {
+    backgroundColor: colors.surface,
+    color: colors.fg,
+    ramp: 'surface',
+    rim: bevel,
+    rimPressed: bevelSunken,
+  },
+  danger: {
+    backgroundColor: colors.error,
+    color: colors.onAccent,
+    ramp: 'danger',
+    rim: bevelDanger,
+    rimPressed: bevelDangerSunken,
+  },
 } as const;
 
 /**
@@ -45,7 +73,17 @@ export function Button({
   accessibilityHint,
   style,
 }: ButtonProps) {
-  const { color, backgroundColor, ramp } = FILLS[tone];
+  const accent = useAccent();
+  const { color, backgroundColor, ramp, rim, rimPressed } =
+    tone === 'primary'
+      ? {
+          backgroundColor: accent.base,
+          color: colors.onAccent,
+          ramp: 'accent' as const,
+          rim: accent.bevel,
+          rimPressed: accent.bevelSunken,
+        }
+      : FILLS[tone];
 
   return (
     <Pressable
@@ -58,6 +96,7 @@ export function Button({
       accessibilityHint={accessibilityHint}
       style={({ pressed }) => [
         styles.base,
+        pressed ? rimPressed : rim,
         pressed ? styles.pressed : styles.raised,
         disabled ? styles.disabled : null,
         style,
@@ -82,8 +121,8 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     justifyContent: 'center',
   },
-  raised: { ...bevel, boxShadow: depth.raised },
-  pressed: { ...bevelSunken, boxShadow: depth.sunken },
+  raised: { boxShadow: depth.raised },
+  pressed: { boxShadow: depth.sunken },
   // The gradient lives on an inner view so the outer one can own the shadow —
   // a shadow and a clipped fill cannot share a node.
   fill: {

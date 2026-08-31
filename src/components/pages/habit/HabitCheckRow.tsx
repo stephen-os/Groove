@@ -4,7 +4,8 @@ import { HabitFace } from '@/components/pages/habit/HabitFace';
 import { Bubble } from '@/components/ui/Bubble';
 import { Card } from '@/components/ui/Card';
 import { Text } from '@/components/ui/Text';
-import { bevel, bevelSunken, colors, depth, radius, spacing } from '@/lib/theme';
+import { useAccent } from '@/hooks/useAccent';
+import { bevelSunken, colors, depth, radius, spacing } from '@/lib/theme';
 
 // One habit on one day, in three states: done, skipped, or neither.
 //
@@ -27,7 +28,7 @@ interface HabitCheckRowProps {
   tint: string;
   done: boolean;
   skipped: boolean;
-  /** "2 to go · on track" for a flexible habit; absent for a daily one. */
+  /** "1/3 this week · on track" for a flexible habit; absent for a daily one. */
   pace?: string;
   /** Future days cannot be changed. */
   disabled?: boolean;
@@ -47,6 +48,7 @@ export function HabitCheckRow({
   onToggle,
   onSkip,
 }: HabitCheckRowProps) {
+  const accent = useAccent();
   const detail = skipped ? 'Skipped' : (pace ?? schedule);
 
   const askToSkip = (): void => {
@@ -98,7 +100,14 @@ export function HabitCheckRow({
           </Text>
         </View>
 
-        <View style={[styles.checkbox, done ? styles.checkboxOn : styles.checkboxOff]}>
+        <View
+          style={[
+            styles.checkbox,
+            done
+              ? { ...accent.bevel, backgroundColor: accent.base, boxShadow: depth.raisedSoft }
+              : styles.checkboxOff,
+          ]}
+        >
           {/* Decorative: the state is already announced by the checkbox role
               and the hint, so the glyph must not be read out again. */}
           {done && <Ionicons name="checkmark" size={26} color={colors.onAccent} />}
@@ -122,7 +131,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  checkboxOn: { ...bevel, backgroundColor: colors.accent, boxShadow: depth.raisedSoft },
   // Sunken and bordered: the well says "put something here", and the hairline
   // carries the same message at a contrast the shadow alone cannot promise.
   checkboxOff: {

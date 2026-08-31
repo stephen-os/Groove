@@ -1,5 +1,3 @@
-import { colors } from './theme';
-
 // What a habit looks like in a list: a glyph and a tint.
 //
 // Both are stored as plain strings so the database never has to know about
@@ -37,6 +35,11 @@ export const HABIT_ICONS: readonly string[] = [
   'home-outline',
   'cash-outline',
   'laptop-outline',
+  'restaurant-outline',
+  'medkit-outline',
+  'people-outline',
+  'briefcase-outline',
+  'game-controller-outline',
 ];
 
 /**
@@ -69,12 +72,17 @@ export function isEmoji(icon: string): boolean {
  * `tests/lib/theme.test.ts` asserts it.
  */
 export const HABIT_COLORS: readonly string[] = [
-  colors.accent,
+  // Its own orange, not the theme accent. These used to start with
+  // `colors.accent`, which meant choosing a highlight colour in Settings
+  // silently repainted every habit that had taken the first swatch — a habit's
+  // tint is a property of the habit, and has to survive a change of theme.
+  '#f08a45',
   '#f2c94c',
   '#5bd88a',
   '#4ecdc4',
   '#6db3f2',
   '#b48ef0',
+  '#ef82d8',
   '#f98a8a',
 ];
 
@@ -91,7 +99,7 @@ export function habitIcon(icon: string): string {
 }
 
 /**
- * The stored tint, or the accent when a habit has never been given one.
+ * The stored tint, or the first of the set when a habit has never been given one.
  *
  * Checked against the palette rather than trusted: the value arrives from the
  * database and, on a restore, ultimately from a file someone could have edited.
@@ -99,5 +107,5 @@ export function habitIcon(icon: string): string {
  * invisible habit at worst.
  */
 export function habitColor(color: string): string {
-  return HABIT_COLORS.includes(color) ? color : colors.accent;
+  return HABIT_COLORS.includes(color) ? color : HABIT_COLORS[0];
 }

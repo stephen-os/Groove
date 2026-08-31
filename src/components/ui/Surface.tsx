@@ -1,11 +1,12 @@
 import { StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useAccent } from '@/hooks/useAccent';
 import { GRADIENT_END, GRADIENT_START, gradients } from '@/lib/theme';
 
 interface SurfaceProps {
   children?: React.ReactNode;
-  /** Which of the palette's ramps to lay down. */
-  ramp?: keyof typeof gradients;
+  /** Which ramp to lay down. 'accent' follows whatever is chosen in Settings. */
+  ramp?: keyof typeof gradients | 'accent';
   style?: StyleProp<ViewStyle>;
 }
 
@@ -21,9 +22,12 @@ interface SurfaceProps {
  * layout all behave exactly as they would on a plain `View`.
  */
 export function Surface({ children, ramp = 'surface', style }: SurfaceProps) {
+  const accent = useAccent();
+  const stops = ramp === 'accent' ? accent.gradient : gradients[ramp];
+
   return (
     <LinearGradient
-      colors={[...gradients[ramp]]}
+      colors={[...stops]}
       start={GRADIENT_START}
       end={GRADIENT_END}
       style={StyleSheet.flatten(style)}

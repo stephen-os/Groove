@@ -1,8 +1,9 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { Bubble } from '@/components/ui/Bubble';
 import { Card } from '@/components/ui/Card';
+import { Chip } from '@/components/ui/Chip';
 import { LineChart } from '@/components/ui/LineChart';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
@@ -19,7 +20,8 @@ import {
   rollingAverage,
   statsFor,
 } from '@/lib/stats';
-import { GUTTER, MIN_TOUCH_TARGET, colors, radius, spacing } from '@/lib/theme';
+import { useAccent } from '@/hooks/useAccent';
+import { GUTTER, colors, spacing } from '@/lib/theme';
 
 type PeriodKey = 'week' | 'month' | 'quarter';
 
@@ -30,6 +32,7 @@ const PERIODS: readonly { readonly key: PeriodKey; readonly label: string }[] = 
 ];
 
 export default function AnalyticsScreen() {
+  const accent = useAccent();
   const today = todayKey();
   const [period, setPeriod] = useState<PeriodKey>('week');
   const [habits, setHabits] = useState<Habit[]>([]);
@@ -90,19 +93,14 @@ export default function AnalyticsScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.chips} accessibilityRole="radiogroup">
           {PERIODS.map((option) => {
-            const selected = period === option.key;
             return (
-              <Pressable
+              <Chip
                 key={option.key}
+                label={option.label}
+                selected={period === option.key}
                 onPress={() => setPeriod(option.key)}
-                accessibilityRole="radio"
-                accessibilityState={{ checked: selected }}
-                style={[styles.chip, selected ? styles.chipOn : styles.chipOff]}
-              >
-                <Text style={selected ? styles.chipTextOn : styles.chipTextOff}>
-                  {option.label}
-                </Text>
-              </Pressable>
+                style={styles.grow}
+              />
             );
           })}
         </View>
@@ -127,6 +125,7 @@ export default function AnalyticsScreen() {
 
           <View style={styles.chart}>
             <LineChart
+              tint={accent.base}
               values={trend.values}
               labels={trend.labels}
               accessibilityLabel={`Completion trend: ${grade.pct} percent, seven-day average`}
@@ -210,18 +209,7 @@ export default function AnalyticsScreen() {
 const styles = StyleSheet.create({
   content: { paddingHorizontal: GUTTER, gap: spacing.sm, paddingVertical: spacing.md },
   chips: { flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' },
-  chip: {
-    minHeight: MIN_TOUCH_TARGET,
-    paddingHorizontal: spacing.md,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  chipOn: { backgroundColor: colors.accent, borderColor: colors.accent },
-  chipOff: { backgroundColor: 'transparent', borderColor: colors.borderStrong },
-  chipTextOn: { color: colors.onAccent },
-  chipTextOff: { color: colors.fg },
+  grow: { flex: 1 },
   section: { marginTop: spacing.md, letterSpacing: 1 },
   gradeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   gradeLabels: { gap: 2 },

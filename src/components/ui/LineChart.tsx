@@ -28,16 +28,11 @@ interface LineChartProps {
   /** Labels for the horizontal axis, one per value; a few are shown. */
   labels: readonly string[];
   /** Drawn in this colour, area included. */
-  tint?: string;
+  tint: string;
   accessibilityLabel: string;
 }
 
-export function LineChart({
-  values,
-  labels,
-  tint = colors.accent,
-  accessibilityLabel,
-}: LineChartProps) {
+export function LineChart({ values, labels, tint, accessibilityLabel }: LineChartProps) {
   // Measured rather than assumed. A fixed viewBox has to be fitted to the real
   // width somehow, and both ways out are wrong: the default letterboxes it, so
   // the drawing ends up shorter than the box the axis labels are laid out

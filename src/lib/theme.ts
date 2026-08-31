@@ -3,10 +3,14 @@ import type { BoxShadowValue } from 'react-native';
 // The single source of colour, depth and spacing. Nothing else defines a hex
 // value, a shadow or a magic pixel number.
 //
-// Groove is dark, full stop — there is no light palette and no runtime switch,
-// so `colors` is a plain object rather than something resolved through a
-// provider. A component imports it directly and its styles go straight into
-// `StyleSheet.create`.
+// Groove is dark, full stop — there is no light palette, so `colors` is a plain
+// object rather than something resolved through a provider. A component imports
+// it directly and its styles go straight into `StyleSheet.create`.
+//
+// The one exception is the accent. It is chosen in Settings, so it cannot be
+// baked into a stylesheet at import time; it lives in `ACCENTS` here and is
+// read through `useAccent()`, which layers it over the static style. Everything
+// else on this page is fixed and stays static.
 //
 // The look is soft-UI: surfaces are the *same* colour as the page and are
 // separated from it by light and dark shadows rather than by borders or fills.
@@ -21,33 +25,33 @@ import type { BoxShadowValue } from 'react-native';
 
 // 1. Raw palette. Not exported: components reference semantic tokens only.
 //
-// A warm-neutral charcoal rather than a blue-grey one, so the orange sits on it
-// as a relative rather than a stranger.
+// Neutral charcoal, not blue-grey. The previous greys leaned measurably blue
+// (`#1d2025` carries eight more blue than red) and at this brightness the eye
+// reads that as navy rather than as a dark grey. These sit within a point or
+// two of neutral on every channel, so whichever accent is chosen is the only
+// real colour on the screen and the page behind it stays out of the argument.
+// The old scheme is kept in `docs/PALETTE-ARCHIVE.md`.
 const slate = {
   // The lift and shade that carve a raised surface out of the page.
-  lift: '#32363e',
-  shade: '#0e1013',
-  recess: '#16181c',
+  lift: '#37373d',
+  shade: '#0f0f10',
+  recess: '#161617',
   // The page, and the two ends of the light falling across it. `page` is the
   // majority colour — the gradient only leans a little either side of it.
-  page: '#1d2025',
-  pageLight: '#23272e',
-  pageDark: '#191c21',
-  surfaceLight: '#22252b',
-  surfaceDark: '#1b1e23',
-  border: '#33373f',
-  borderStrong: '#767b85',
-  muted: '#9aa0aa',
-  fg: '#eef0f3',
+  page: '#1f1f21',
+  pageLight: '#26262a',
+  pageDark: '#1a1a1c',
+  surfaceLight: '#252528',
+  surfaceDark: '#1c1c1e',
+  border: '#36363b',
+  borderStrong: '#7a7a80',
+  muted: '#9c9ca3',
+  fg: '#f0f0f2',
 } as const;
 
+// Semantic hues. These say what happened and are not the user's to choose —
+// green means met and red means destructive, whatever the accent is set to.
 const hue = {
-  // Bright enough to read as a highlight on charcoal, warm enough to feel like
-  // a sunrise rather than a warning light.
-  ember: '#ff8a3d',
-  emberLight: '#ffa563',
-  emberDark: '#f0741f',
-  emberDim: '#c25a18',
   sage: '#5bd88a',
   rose: '#f98a8a',
   roseLight: '#ffa3a3',
@@ -73,10 +77,13 @@ export interface Colors {
   border: string;
   /** Control boundaries and focus rings. Meets 3:1 (WCAG 1.4.11). */
   borderStrong: string;
-  accent: string;
-  /** A dimmer accent for fills that sit behind text. */
-  accentDim: string;
-  /** Text and icons drawn ON the accent fill. */
+  /**
+   * Text and icons drawn ON a saturated fill — any accent, or the danger red.
+   *
+   * Dark, not the page colour: every fill the app lays down is brighter than
+   * its background, so the readable label on one is near-black. Easy to get
+   * backwards, which is why the contrast test asserts it for every accent.
+   */
   onAccent: string;
   /** A habit met its target. */
   success: string;
@@ -95,8 +102,6 @@ export const colors: Colors = {
   muted: slate.muted,
   border: slate.border,
   borderStrong: slate.borderStrong,
-  accent: hue.ember,
-  accentDim: hue.emberDim,
   onAccent: slate.shade,
   success: hue.sage,
   error: hue.rose,
@@ -128,7 +133,9 @@ export const gradients = {
   // into visible stripes, and a midpoint shortens each run enough to hide it.
   page: [slate.pageLight, slate.page, slate.pageDark] as const,
   surface: [slate.surfaceLight, slate.surfaceDark] as const,
-  accent: [hue.emberLight, hue.emberDark] as const,
+  // The accent's ramp is not here: it depends on which accent is chosen, so it
+  // lives on the `Accent` and reaches a `Surface` through `useAccent()`.
+  //
   // Destructive controls need their own ramp. Without one they fell back to the
   // surface ramp, whose opaque stops painted straight over the red fill and
   // left "Erase all data" as dark text on a dark card.
@@ -232,6 +239,121 @@ export const bevelRound: { readonly borderWidth: number; readonly borderColor: s
   borderWidth: BEVEL_WIDTH,
   borderColor: slate.border,
 };
+
+/**
+ * A bevel made from a fill's own colour.
+ *
+ * A rim only reads as a moulded edge when it is the surface catching light,
+ * which means it has to be that surface's colour. Putting the charcoal bevel on
+ * an orange button drew a grey outline around it — the button looked pasted on
+ * rather than pressed out, which is why the filled ones never matched the cards
+ * around them.
+ */
+function bevelOf(light: string, dark: string): Bevel {
+  return {
+    borderWidth: BEVEL_WIDTH,
+    borderTopColor: light,
+    borderLeftColor: light,
+    borderRightColor: dark,
+    borderBottomColor: dark,
+  };
+}
+
+export const bevelDanger = bevelOf(hue.roseLight, hue.roseDark);
+// Light and shade swapped, for the pressed state. A filled button's inset
+// shadow is nearly invisible against a bright fill, so the rim is what has to
+// carry the press — and it carries it without relying on colour.
+export const bevelDangerSunken = bevelOf(hue.roseDark, hue.roseLight);
+
+// 3. Accents — the one part of the palette that is the user's to choose.
+
+export type AccentKey =
+  | 'orange'
+  | 'yellow'
+  | 'green'
+  | 'teal'
+  | 'blue'
+  | 'purple'
+  | 'pink'
+  | 'red';
+
+/**
+ * A highlight colour, with everything derived from it that the app draws.
+ *
+ * Three tones rather than one. `base` is the flat fill; `light` and `dark` are
+ * the ends of the gradient across it and the two halves of its bevel, so a
+ * filled control is lit from the same corner as every card around it. Deriving
+ * them here rather than at each call site is what stops a new accent arriving
+ * with a rim that does not match its own fill.
+ */
+export interface Accent {
+  readonly key: AccentKey;
+  /** Shown in the Settings picker. */
+  readonly label: string;
+  readonly base: string;
+  readonly light: string;
+  readonly dark: string;
+  readonly gradient: readonly [string, string];
+  readonly bevel: Bevel;
+  readonly bevelSunken: Bevel;
+}
+
+/**
+ * Every accent is held to the bar the single accent used to be: 4.5:1 against
+ * `onAccent` at all three tones, and 4.5:1 against the page, because an accent
+ * is drawn as bare text and as bare icons as well as behind a label.
+ * `tests/lib/theme.test.ts` asserts all of them, so one that fails cannot ship.
+ *
+ * Orange is deliberately darker than it was. The old `#ff8a3d` sat near the top
+ * of that range and glared against the page; this is a couple of steps down,
+ * and its light and dark ends are closer together so a filled control reads as
+ * lit rather than as two-tone.
+ */
+const RAMPS: Record<AccentKey, readonly [string, string, string, string]> = {
+  orange: ['Orange', '#ee7b2f', '#f7914b', '#d9661d'],
+  yellow: ['Yellow', '#e0ac2b', '#edbb45', '#c8941a'],
+  green: ['Green', '#4dbf6c', '#66cd82', '#38a857'],
+  teal: ['Teal', '#32bfb0', '#4fd0c2', '#20a698'],
+  blue: ['Blue', '#4f9bf5', '#6cadf8', '#357fdb'],
+  purple: ['Purple', '#a279f2', '#b493f6', '#9366e6'],
+  pink: ['Pink', '#e074d2', '#e98cdd', '#c95abb'],
+  red: ['Red', '#ef6f6f', '#f78b8b', '#d95555'],
+};
+
+export const ACCENTS: Record<AccentKey, Accent> = Object.fromEntries(
+  Object.entries(RAMPS).map(([key, [label, base, light, dark]]) => [
+    key,
+    {
+      key: key as AccentKey,
+      label,
+      base,
+      light,
+      dark,
+      gradient: [light, dark] as const,
+      bevel: bevelOf(light, dark),
+      bevelSunken: bevelOf(dark, light),
+    } satisfies Accent,
+  ])
+) as Record<AccentKey, Accent>;
+
+/** Every accent, in picker order: warm through cool and back round. */
+export const ACCENT_KEYS = Object.keys(RAMPS) as AccentKey[];
+
+export const DEFAULT_ACCENT: AccentKey = 'orange';
+
+/**
+ * Narrows a value read from the database.
+ *
+ * The setting is a free-text column and could hold the name of an accent an
+ * older build offered, so an unknown one falls back rather than leaving the app
+ * with no highlight colour at all.
+ */
+export function toAccentKey(value: string | null): AccentKey {
+  // `hasOwn`, not `in`: `in` walks the prototype chain, so 'constructor' and
+  // 'toString' passed the guard and handed the app `Object.prototype.constructor`
+  // as its accent — a function, which every read of `.base` then blanked.
+  return value !== null && Object.hasOwn(ACCENTS, value) ? (value as AccentKey) : DEFAULT_ACCENT;
+}
 
 /** 4pt grid. Use these rather than raw numbers so rhythm stays consistent. */
 export const spacing = {

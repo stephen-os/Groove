@@ -12,12 +12,18 @@ const TONES = {
   default: { color: colors.fg },
   muted: { color: colors.muted },
   error: { color: colors.error },
-  accent: { color: colors.accent },
 } as const;
 
 interface TextProps extends RNTextProps {
   variant?: keyof typeof VARIANTS;
-  /** 'muted' still meets AA on every background; 'error' for failure messages. */
+  /**
+   * 'muted' still meets AA on every background; 'error' for failure messages.
+   *
+   * There is no accent tone. The accent is chosen at runtime and this component
+   * is on nearly every line of the app — the one place that wants accent text
+   * reads `useAccent()` and passes a colour, rather than every `Text` in the
+   * tree subscribing to a context it does not use.
+   */
   tone?: keyof typeof TONES;
 }
 
