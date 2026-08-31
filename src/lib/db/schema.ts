@@ -40,7 +40,14 @@ export const SCHEMA: readonly string[] = [
     -- bit 6 is Saturday. Matching the platform's own numbering means no
     -- conversion, and no off-by-one to get wrong twice. 127 is every day. The
     -- Monday-first display order lives in the UI, not here.
-    weekday_mask   INTEGER NOT NULL DEFAULT 127,
+    --
+    -- CHECKed rather than merely defaulted. A habit on no days can never come
+    -- due, and the backup schema refuses to write one - so a zero here is not a
+    -- habit that behaves oddly, it is a habit that silently makes the whole
+    -- device's backup fail to validate. The form guards it for daily habits;
+    -- this guards it for every path, including a flexible habit whose day chips
+    -- were left switched off and a restore from a hand-edited file.
+    weekday_mask   INTEGER NOT NULL DEFAULT 127 CHECK (weekday_mask BETWEEN 1 AND 127),
     -- How many times per week or per month a flexible habit must be done.
     target_count   INTEGER NOT NULL DEFAULT 1,
     -- 'HH:MM' in local time, or NULL when the habit has no due time. A

@@ -83,9 +83,21 @@ export async function renameProfile(id: number, name: string): Promise<void> {
 /**
  * Deletes a profile and everything in it.
  *
- * The cascade takes its habits, their completions and their pending alerts. The
- * last profile cannot be deleted: the whole app assumes one always exists, and
- * "erase all data" is the operation that means what deleting it would.
+ * The last profile cannot be deleted: the whole app assumes one always exists,
+ * and "erase all data" is the operation that means what deleting it would. *
+ * **Cascades do not fire in here.** `withExclusiveTransactionAsync` runs on a
+ * second connection that expo-sqlite opens itself and never sets `foreign_keys`
+ * on, and SQLite defaults that pragma OFF per connection — so every
+ * `ON DELETE CASCADE` in the schema is inert inside one of these blocks. The
+ * pragma cannot simply be moved either: SQLite ignores it inside a transaction.
+ * So children are deleted explicitly, deepest first. `tests/lib/db/cascade.test.ts`
+ * pins this.
+ *
+ * Orphans here are not a tidiness problem. A habit whose profile is gone still
+ * matches `exportData`'s unfiltered `SELECT * FROM habits`, so it rides along in
+ * every future backup — and `referentialError` rejects a file whose habit names
+ * a profile it does not contain. Deleting one profile would quietly make every
+ * later export permanently unrestorable.
  */
 export async function deleteProfile(id: number): Promise<void> {
   const db = await getDatabase();
@@ -103,6 +115,16 @@ export async function deleteProfile(id: number): Promise<void> {
   const active = await getActiveProfileId();
 
   await db.withExclusiveTransactionAsync(async (txn) => {
+    await txn.runAsync(
+      `DELETE FROM completions WHERE habit_id IN
+         (SELECT id FROM habits WHERE profile_id = ?)`,
+      [id]
+    );
+    await txn.runAsync(
+      'DELETE FROM scheduled_notifs WHERE habit_id IN (SELECT id FROM habits WHERE profile_id = ?)',
+      [id]
+    );
+    await txn.runAsync('DELETE FROM habits WHERE profile_id = ?', [id]);
     await txn.runAsync('DELETE FROM profiles WHERE id = ?', [id]);
     if (active === id) {
       await txn.runAsync(
@@ -117,24 +139,51 @@ export async function deleteProfile(id: number): Promise<void> {
 /**
  * Empties a profile without removing it.
  *
- * Deleting its habits cascades to their completions, so this clears the history
- * as well — which is what "start over" means. The profile and its name survive.
+ * The history goes with the habits, which is what "start over" means. The
+ * profile and its name survive. *
+ * **Cascades do not fire in here.** `withExclusiveTransactionAsync` runs on a
+ * second connection that expo-sqlite opens itself and never sets `foreign_keys`
+ * on, and SQLite defaults that pragma OFF per connection — so every
+ * `ON DELETE CASCADE` in the schema is inert inside one of these blocks. The
+ * pragma cannot simply be moved either: SQLite ignores it inside a transaction.
+ * So children are deleted explicitly, deepest first. `tests/lib/db/cascade.test.ts`
+ * pins this.
  */
 export async function resetProfile(id: number): Promise<void> {
   const db = await getDatabase();
-  // One statement, so it is already atomic — no transaction to open.
-  await db.runAsync('DELETE FROM habits WHERE profile_id = ?', [id]);
+  await db.withExclusiveTransactionAsync(async (txn) => {
+    await txn.runAsync(
+      `DELETE FROM completions WHERE habit_id IN
+         (SELECT id FROM habits WHERE profile_id = ?)`,
+      [id]
+    );
+    await txn.runAsync(
+      'DELETE FROM scheduled_notifs WHERE habit_id IN (SELECT id FROM habits WHERE profile_id = ?)',
+      [id]
+    );
+    await txn.runAsync('DELETE FROM habits WHERE profile_id = ?', [id]);
+  });
 }
 
 /**
  * Erases everything and starts again with one empty profile.
  *
  * Rebuilds the same state the schema seeds on a fresh install, rather than
- * leaving the app with no profile at all — every screen assumes one exists.
+ * leaving the app with no profile at all — every screen assumes one exists. *
+ * **Cascades do not fire in here.** `withExclusiveTransactionAsync` runs on a
+ * second connection that expo-sqlite opens itself and never sets `foreign_keys`
+ * on, and SQLite defaults that pragma OFF per connection — so every
+ * `ON DELETE CASCADE` in the schema is inert inside one of these blocks. The
+ * pragma cannot simply be moved either: SQLite ignores it inside a transaction.
+ * So children are deleted explicitly, deepest first. `tests/lib/db/cascade.test.ts`
+ * pins this.
  */
 export async function eraseAllData(): Promise<void> {
   const db = await getDatabase();
   await db.withExclusiveTransactionAsync(async (txn) => {
+    await txn.execAsync('DELETE FROM scheduled_notifs');
+    await txn.execAsync('DELETE FROM completions');
+    await txn.execAsync('DELETE FROM habits');
     await txn.execAsync('DELETE FROM profiles');
     const result = await txn.runAsync('INSERT INTO profiles (name, created_at) VALUES (?, ?)', [
       'Personal',

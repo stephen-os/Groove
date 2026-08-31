@@ -1,5 +1,5 @@
-import { useCallback, useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Alert, AppState, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect } from 'expo-router';
 import { HabitCheckRow } from '@/components/pages/habit/HabitCheckRow';
@@ -44,11 +44,27 @@ interface Cell {
 
 export default function HistoryScreen() {
   const accent = useAccent();
-  const today = todayKey();
+  // State, not a value recomputed each render. Nothing re-renders this screen
+  // just because the clock passed midnight, so a render-scoped `todayKey()`
+  // leaves the real today marked `future` and disabled until something else
+  // happens to re-render — and every "is this in the past" test on the screen
+  // is answered against yesterday.
+  const [today, setToday] = useState(todayKey);
   const [anchor, setAnchor] = useState(today);
   const [selected, setSelected] = useState(today);
   const [habits, setHabits] = useState<Habit[]>([]);
   const [completions, setCompletions] = useState<Completion[]>([]);
+
+  // Focus is not enough: this screen can sit in front of you across midnight
+  // without ever being blurred. Coming back to the foreground is the other
+  // moment the date can have moved.
+  useEffect(() => {
+    const refresh = (): void => setToday(todayKey());
+    const subscription = AppState.addEventListener('change', (next) => {
+      if (next === 'active') refresh();
+    });
+    return () => subscription.remove();
+  }, []);
 
   const month = useMemo(() => monthRange(anchor), [anchor]);
 
@@ -157,7 +173,12 @@ export default function HistoryScreen() {
     // day whose completions are no longer loaded, so a fully ticked day shows
     // as empty — and ticking it then deletes the rows it was hiding.
     const range = monthRange(next);
-    setSelected(today >= range.from && today <= range.to ? today : range.from);
+    // Never past today. The grid disables future cells, but this picks a day
+    // programmatically and so goes around that guard — stepping forward from
+    // the last day of a month selected tomorrow, and a tick on tomorrow counts
+    // toward this week's target: the habit disappears from Today, its reminders
+    // stop being placed, and the streak scores a week that has not happened.
+    setSelected(today >= range.from && today <= range.to ? today : (range.from <= today ? range.from : today));
   };
 
   // Progress is attached where the shape is still known, rather than recovered
@@ -178,6 +199,10 @@ export default function HistoryScreen() {
       pace: paceLabel(entry, selected),
     })),
   ]);
+
+  // Whether the month in view has already begun. A month entirely ahead of
+  // today has no day that can be edited, so there is nothing to go there for.
+  const canGoForward = monthRange(addDays(month.to, 1)).from <= today;
 
   return (
     <Screen edgeToEdgeBottom>
@@ -201,11 +226,17 @@ export default function HistoryScreen() {
 
           <Pressable
             onPress={() => shiftMonth(1)}
+            disabled={!canGoForward}
             accessibilityRole="button"
             accessibilityLabel="Next month"
+            accessibilityState={{ disabled: !canGoForward }}
             style={styles.monthButton}
           >
-            <Ionicons name="chevron-forward" size={22} color={accent.base} />
+            <Ionicons
+              name="chevron-forward"
+              size={22}
+              color={canGoForward ? accent.base : colors.border}
+            />
           </Pressable>
         </View>
 
@@ -293,6 +324,9 @@ export default function HistoryScreen() {
                   done={row.done}
                   skipped={row.skipped}
                   pace={row.pace}
+                  // Today passes this and History did not, which is the whole
+                  // reason a future day could be ticked at all.
+                  disabled={selected > today}
                   onToggle={() => mark(row.habit.id, row.done ? null : 'done')}
                   onSkip={() => mark(row.habit.id, row.skipped ? null : 'skipped')}
                 />

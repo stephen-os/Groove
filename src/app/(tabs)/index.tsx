@@ -1,5 +1,5 @@
-import { useCallback, useMemo, useState } from 'react';
-import { Alert, Pressable, SectionList, StyleSheet, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Alert, AppState, Pressable, SectionList, StyleSheet, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect } from 'expo-router';
 import { HabitCheckRow } from '@/components/pages/habit/HabitCheckRow';
@@ -52,6 +52,26 @@ export default function TodayScreen() {
   // well as "what is left now".
   const [day, setDay] = useState(today);
   const readOnly = day !== today;
+
+  // Focus is not the only way midnight arrives. This tab is the one the app
+  // opens on, so the ordinary case is that it is never navigated away from at
+  // all: leave the phone on this screen at 23:58 and unlock it at 00:05 and no
+  // focus event ever fires. `today` and `day` both still say yesterday,
+  // `readOnly` is false, the header reads "Today", and a tick writes the
+  // completion to the wrong date while yesterday's reminders are cancelled and
+  // today's keep firing. Returning to the foreground is the other moment the
+  // date can have moved, so it re-reads it too.
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (next) => {
+      if (next !== 'active') return;
+      const now = todayKey();
+      setToday((was) => {
+        if (was !== now) setDay(now);
+        return now;
+      });
+    });
+    return () => subscription.remove();
+  }, []);
 
   // Weekly and monthly habits count completions across their whole period, and
   // a week can straddle a month boundary — so load the union of both ranges

@@ -2,6 +2,12 @@
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "strict": true,
+    // For tests/support/expo-sqlite.ts, which imports node:sqlite. Expo's base
+    // sets `customConditions: ["react-native"]`, and @types/node has no such
+    // condition to resolve through, so the built-ins are invisible without
+    // naming it here. Safe because nothing in src/ touches a global that Node
+    // and React Native type differently — no setTimeout, no process, no Buffer.
+    "types": ["node"],
     "paths": {
       "@/*": [
         "./src/*"

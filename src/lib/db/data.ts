@@ -55,10 +55,15 @@ export async function exportData(): Promise<GrooveData> {
  * to reconcile two histories, and a restore that silently duplicated six months
  * of completions would be worse than one that is explicit about overwriting.
  *
- * Deleting the profiles cascades to habits and completions, so the three tables
- * are cleared in the right order without saying so. The scheduled notifications
- * go too — they point at habits that no longer exist, and the caller reschedules
- * from scratch afterwards.
+ * The scheduled notifications go too — they point at habits that no longer
+ * exist, and the caller reschedules from scratch afterwards. *
+ * **Cascades do not fire in here.** `withExclusiveTransactionAsync` runs on a
+ * second connection that expo-sqlite opens itself and never sets `foreign_keys`
+ * on, and SQLite defaults that pragma OFF per connection — so every
+ * `ON DELETE CASCADE` in the schema is inert inside one of these blocks. The
+ * pragma cannot simply be moved either: SQLite ignores it inside a transaction.
+ * So children are deleted explicitly, deepest first. `tests/lib/db/cascade.test.ts`
+ * pins this.
  *
  * Exclusive, not `withTransactionAsync`. That one is a bare BEGIN/COMMIT on the
  * app's single shared connection, so a second transaction starting while this
@@ -73,6 +78,8 @@ export async function replaceData(data: GrooveData): Promise<void> {
 
   await db.withExclusiveTransactionAsync(async (txn) => {
     await txn.execAsync('DELETE FROM scheduled_notifs');
+    await txn.execAsync('DELETE FROM completions');
+    await txn.execAsync('DELETE FROM habits');
     await txn.execAsync('DELETE FROM profiles');
 
     for (const profile of data.profiles) {

@@ -115,7 +115,14 @@ export function HabitForm({ initial, submitLabel, onSubmit, onArchive }: HabitFo
       icon,
       color,
       scheduleKind: kind,
-      weekdayMask,
+      // A flexible habit is not scheduled by its mask, so whatever the day
+      // chips were left on is meaningless — but it is still stored, and the
+      // backup schema requires at least one bit. Untick every day, switch to
+      // Weekly, and the guard above no longer applies: a habit would save with
+      // `weekday_mask = 0`, look perfectly normal forever, and then fail
+      // validation inside the device's own backup, taking the whole file with
+      // it. Store the schema's default instead, symmetrically with the count.
+      weekdayMask: kind === 'daily' ? weekdayMask : EVERY_DAY,
       // A daily habit is scheduled by its mask, so a count would be a second
       // source of truth for the same thing. Store the schema's default.
       targetCount: kind === 'daily' ? 1 : targetCount,
