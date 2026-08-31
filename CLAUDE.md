@@ -12,20 +12,20 @@ no server, no accounts, no network.
 src/app         routes (expo-router: the file tree IS the navigation)
                 (tabs)/ Today · History · Analytics · Settings
 src/components  ui/ primitives, pages/ screen-specific
-src/lib         theme, date, schedule, stats, reminder-plan (all pure)
-                db/ (schema + access), backup, notifications, reminders
+src/lib         theme, date, schedule, stats, reminder-plan, transfer (all pure)
+                db/ (schema + access), backup, backup-file, notifications, reminders
 plugins         Expo config plugins (release signing)
 tests           Vitest suites for the pure logic
 assets          app icon, splash, adaptive icon
 docs            DEVELOPMENT.md (build and run) · RELEASE.md (ship it)
 ```
 
-`src/hooks` and `src/types` don't exist yet — create each when its first occupant
-appears. Import by absolute path (`@/...`).
+`src/types` doesn't exist yet — create it when its first occupant appears.
+Import by absolute path (`@/...`).
 
 ### Where the logic lives
 
-Four pure modules carry the whole app, and each has a test suite:
+Five pure modules carry the whole app, and each has a test suite:
 
 - **`date.ts`** — day keys. A habit day is a local calendar day, never a timestamp.
 - **`schedule.ts`** — `habitsDueOn` decides what is due on a given day. Today, the
@@ -33,6 +33,8 @@ Four pure modules carry the whole app, and each has a test suite:
 - **`stats.ts`** — completion rates, streaks and grades, measured against *scheduled*
   opportunities rather than calendar days.
 - **`reminder-plan.ts`** — `planAlerts` decides which notifications should exist.
+- **`transfer.ts`** — moving habits between phones. `scopeToProfile` and
+  `stripHistory` decide what a file contains; `planImport` turns one back into rows.
 
 Everything touching SQLite or the notification service is a thin wrapper around these.
 Adding logic to a screen instead of to one of these is how it stops being testable.
@@ -95,6 +97,23 @@ just read. Several of these look correct and fail at runtime.
   is a display concern and lives in `WEEKDAYS`, not in storage.
 - **Habits archive, they don't delete.** `archived_at` keeps their history in the
   statistics.
+- **Import adds, restore replaces, and the difference is structural.** `importProfiles`
+  only ever *creates* profiles, so there is no existing profile for it to merge into and
+  nothing it can overwrite; `replaceData` wipes the database and is reachable only from
+  "Start over". Keep that split — a merging import has no sane answer for two histories
+  with device-local ids.
+- **Profile names are unique, case-insensitively**, enforced by
+  `idx_profiles_name` and mirrored by `parseBackup` (a file describing two profiles with
+  one name is refused). Import asks for a replacement rather than inventing one —
+  auto-suffixing produced "Personal" directly above "Personal (imported)", which is the
+  confusion the rule exists to prevent. `isNameTaken` is the one comparison; use it
+  everywhere rather than a `Set` lookup, so case and stray space keep matching.
+- **A file's ids belong to the phone that wrote it.** `planImport` drops them and nests
+  the rows instead, so nothing downstream has to renumber anything. Do not reintroduce a
+  flat plan keyed by id.
+- **A habits-only export moves `startsOn` to today.** Carrying the original start date
+  onto a phone with no history would score the new owner as having missed every day
+  since. `stripHistory` owns that, and a test pins it.
 - The **pure decisions** — which habits are due on a day, whether a backup is valid,
   what a completion rate is — are separated from the SQLite and file-system calls
   around them. Keep that split; it is what makes any of this testable without a device.
@@ -126,15 +145,25 @@ The web rules don't translate directly; these are the mobile equivalents.
 
 ### Theming
 
-- The app is **dark only**. There is no light palette, no theme provider and no runtime
-  switch, so `colors` is a plain object imported directly and styles go straight into
-  `StyleSheet.create`.
+- The app is **dark only**. There is no light palette, so `colors` is a plain object
+  imported directly and styles go straight into `StyleSheet.create`.
+- **The accent is the one exception, and it changes at runtime.** It is chosen in
+  Settings and stored in `settings`, so it cannot be baked into a stylesheet at import
+  time. `ACCENTS` in `theme.ts` holds every option; `useAccent()` returns the one in
+  force, and a component layers it over its static style. Anything drawn in the accent —
+  a fill, a rim, a gradient, an icon — reads the hook. `colors.accent` does not exist;
+  if you find yourself wanting it, you want `useAccent()`.
+- A **habit's tint is not the accent** and must not follow it. `HABIT_COLORS` owns its
+  own palette, and a test asserts the two sets never overlap.
 - All colour lives in `src/lib/theme.ts`. No hex values in components.
 - `border` is decorative; **`borderStrong` is for control boundaries** and is the only
   one that meets the 3:1 of WCAG 1.4.11.
 - `onAccent` is the text colour *on* the accent fill — on a light accent it's dark.
 - Contrast is asserted in `tests/lib/theme.test.ts`, including against `bgAlt`, which is
-  the tightest pairing and the one an input border uses.
+  the tightest pairing and the one an input border uses. **Every accent is asserted
+  too** — against the page at all three tones and against the label drawn on it — so a
+  new one that fails cannot ship. That is what makes offering a picker safe.
+- Superseded palettes are recorded in `docs/PALETTE-ARCHIVE.md`.
 
 ## Verify
 
