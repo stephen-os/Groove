@@ -32,6 +32,14 @@ interface HabitCheckRowProps {
   pace?: string;
   /** Future days cannot be changed. */
   disabled?: boolean;
+  /**
+   * How to name the day being ticked — "today", or "on 12 August".
+   *
+   * History edits any past day through this same row, so a hard-coded "today"
+   * asked whether to skip a habit today while the screen was showing the 12th,
+   * and TalkBack announced the action as "Skip today" for a day three weeks ago.
+   */
+  when?: string;
   onToggle: () => void;
   onSkip: () => void;
 }
@@ -45,6 +53,7 @@ export function HabitCheckRow({
   skipped,
   pace,
   disabled = false,
+  when = 'today',
   onToggle,
   onSkip,
 }: HabitCheckRowProps) {
@@ -58,11 +67,11 @@ export function HabitCheckRow({
       return;
     }
     Alert.alert(
-      `Skip ${name} today?`,
-      'It stops asking, and today is left out of your rate rather than counted against it.',
+      `Skip ${name} ${when}?`,
+      'It stops asking, and that day is left out of your rate rather than counted against it.',
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Skip today', onPress: onSkip },
+        { text: 'Skip', onPress: onSkip },
       ]
     );
   };
@@ -80,7 +89,7 @@ export function HabitCheckRow({
         // Long-press is discoverable by convention but not by sight, so screen
         // readers get skipping as a named action rather than a gesture.
         accessibilityActions={[
-          { name: 'longpress', label: skipped ? 'Un-skip' : 'Skip today' },
+          { name: 'longpress', label: skipped ? 'Un-skip' : `Skip ${when}` },
         ]}
         onAccessibilityAction={(event) => {
           if (event.nativeEvent.actionName === 'longpress') askToSkip();

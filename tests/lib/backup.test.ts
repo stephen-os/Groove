@@ -195,6 +195,31 @@ describe('parseBackup referential integrity', () => {
     expectRejected(backup, 'same name');
   });
 
+  it('rejects duplicate completion ids', () => {
+    // `replaceData` inserts completions with their ids spelled out, so a
+    // duplicate is not a bad row that gets skipped — it is a constraint failure
+    // once part of the file has already been written.
+    const backup = validBackup();
+    const completions = backup.completions as { id: number; day: string }[];
+    completions.push({ ...completions[0], day: '2026-09-02' });
+    expectRejected(backup, 'duplicate completions');
+  });
+
+  it('rejects a profile with no name', () => {
+    // Not something either form can produce, but a hand-edited file can — and
+    // since names are unique it would leave a profile nothing can tell apart,
+    // in the one screen whose whole job is telling them apart.
+    const backup = validBackup();
+    (backup.profiles as { name: string }[])[0].name = '';
+    expectRejected(backup, 'not a valid backup');
+  });
+
+  it('rejects a habit with no name', () => {
+    const backup = validBackup();
+    (backup.habits as { name: string }[])[0].name = '';
+    expectRejected(backup, 'not a valid backup');
+  });
+
   it('rejects duplicate habit ids', () => {
     const backup = validBackup();
     const habits = backup.habits as { id: number }[];

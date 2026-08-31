@@ -69,12 +69,17 @@ export function TransferCard({ onFinished }: { onFinished: (message: string) => 
       .then((file) => {
         if (!file.ok) {
           setStatus(file.message);
+          setBusy(false);
           return;
         }
         if (file.clashes.length === 0) {
           // Nothing to settle, so nothing to ask. This is the ordinary case —
-          // a file arriving on a phone that has never heard of it.
-          return run(() => commitImport(file.data, new Map()));
+          // a file arriving on a phone that has never heard of it. `run` owns
+          // `busy` from here: clearing it in a `finally` released the buttons
+          // the instant the import *started*, because `run` returns void and
+          // there was nothing for the chain to wait on.
+          run(() => commitImport(file.data, new Map()));
+          return;
         }
         setPending({
           data: file.data,
@@ -82,12 +87,13 @@ export function TransferCard({ onFinished }: { onFinished: (message: string) => 
           taken: file.taken,
           chosen: Object.fromEntries(file.clashes.map((clash) => [clash.id, clash.name])),
         });
+        setBusy(false);
       })
       .catch((error: unknown) => {
         console.error('Import failed:', error);
         setStatus('Could not read that file.');
-      })
-      .finally(() => setBusy(false));
+        setBusy(false);
+      });
   };
 
   /** Why this name will not do, or undefined if it will. */
@@ -95,12 +101,22 @@ export function TransferCard({ onFinished }: { onFinished: (message: string) => 
     const name = value.trim();
     if (name.length === 0) return 'A name is required.';
     if (isNameTaken(name, pending?.taken ?? [])) return 'That name is already used.';
-    // The other answers on this form count too — two clashes resolved to the
-    // same new name would fail on the unique index after the first one landed.
+
+    // Everything else the import is about to create counts too, and there are
+    // two sorts. The other answers on this form, because two clashes resolved to
+    // the same new name collide with each other. And the profiles in the file
+    // that did *not* clash — renaming "Personal" to "Work" when the file already
+    // contains a Work passed this check and then failed on the unique index
+    // mid-import, rolling the whole thing back for a name the form had accepted.
     const others = Object.entries(pending?.chosen ?? {})
       .filter(([key]) => Number(key) !== id)
       .map(([, other]) => other.trim());
-    if (isNameTaken(name, others)) return 'That name is used by another profile in this file.';
+    const untouched = (pending?.data.profiles ?? [])
+      .filter((profile) => !(pending?.clashes ?? []).some((clash) => clash.id === profile.id))
+      .map((profile) => profile.name);
+    if (isNameTaken(name, [...others, ...untouched])) {
+      return 'That name is used by another profile in this file.';
+    }
     return undefined;
   };
 

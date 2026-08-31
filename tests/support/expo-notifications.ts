@@ -28,8 +28,10 @@ const pending = new Map<string, Pending>();
 export const inspect = {
   pending: (): Pending[] => [...pending.values()],
   ids: (): string[] => [...pending.keys()],
+  dismissed: (): string[] => [...dismissed],
   reset: (): void => {
     pending.clear();
+    dismissed.length = 0;
     nextId = 1;
     permission = { granted: true, canAskAgain: true };
     refuseNext = 0;
@@ -129,6 +131,20 @@ export async function scheduleNotificationAsync(request: {
   });
   return id;
 }
+
+/**
+ * Delivered notifications are not modelled separately.
+ *
+ * The real one clears something already in the shade, which this scheduler has
+ * no notion of — so dismissing behaves like cancelling: quietly successful
+ * whether or not the id means anything, exactly as the real API does.
+ */
+export async function dismissNotificationAsync(id: string): Promise<void> {
+  dismissed.push(id);
+}
+
+/** Ids the app has asked to clear from the shade. */
+const dismissed: string[] = [];
 
 export async function cancelScheduledNotificationAsync(id: string): Promise<void> {
   // Succeeds whether or not the id is still pending — the real one does too,

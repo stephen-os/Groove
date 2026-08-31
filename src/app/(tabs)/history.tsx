@@ -27,6 +27,7 @@ import {
   weekRange,
   windowFor,
 } from '@/lib/schedule';
+import { dailyRates } from '@/lib/stats';
 import { useAccent } from '@/hooks/useAccent';
 import { GUTTER, MIN_TOUCH_TARGET, colors, radius, spacing } from '@/lib/theme';
 
@@ -103,24 +104,32 @@ export default function HistoryScreen() {
 
   const index = useMemo(() => indexCompletions(completions), [completions]);
 
+  // `dailyRates`, not a second count of the same thing. The grid used to work
+  // it out from `habitsDueOn`, which lists a flexible habit every day until its
+  // target is met — so a day with the daily habit done and a weekly one still
+  // outstanding read 50% here and 100% on the chart, for the same day. A
+  // flexible habit is owed on no particular day, which is why `dailyRates`
+  // counts it only where it was actually done, and that is the one this now
+  // uses. It also stops at today, so a future cell has no percentage to
+  // announce rather than announcing nought.
+  const rates = useMemo(
+    () => new Map(dailyRates(habits, index, grid, today).map((rate) => [rate.day, rate.pct])),
+    [habits, index, grid, today]
+  );
+
   const cells = useMemo(() => {
     const built: Cell[] = [];
     for (let day = grid.from; day <= grid.to; day = addDays(day, 1)) {
-      const due = habitsDueOn(habits, index, day);
-      const entries = [...due.daily, ...due.weekly, ...due.monthly];
-      // Skipped habits leave the denominator entirely — a day you opted out of
-      // should not read as a half-finished one.
-      const counted = entries.filter((entry) => !entry.skipped);
-      const finished = counted.filter((entry) => entry.done).length;
+      const pct = rates.get(day) ?? null;
       built.push({
         day,
         inMonth: day >= month.from && day <= month.to,
         future: day > today,
-        ratio: counted.length === 0 ? null : finished / counted.length,
+        ratio: pct === null ? null : pct / 100,
       });
     }
     return built;
-  }, [grid, month, habits, index, today]);
+  }, [grid, month, today, rates]);
 
   const due = useMemo(() => habitsDueOn(habits, index, selected), [habits, index, selected]);
 
@@ -327,6 +336,16 @@ export default function HistoryScreen() {
                   // Today passes this and History did not, which is the whole
                   // reason a future day could be ticked at all.
                   disabled={selected > today}
+                  // The same row edits any day here, so it must not call every
+                  // one of them "today".
+                  when={
+                    selected === today
+                      ? 'today'
+                      : `on ${fromDayKey(selected).toLocaleDateString(undefined, {
+                          day: 'numeric',
+                          month: 'long',
+                        })}`
+                  }
                   onToggle={() => mark(row.habit.id, row.done ? null : 'done')}
                   onSkip={() => mark(row.habit.id, row.skipped ? null : 'skipped')}
                 />

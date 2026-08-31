@@ -219,9 +219,13 @@ export async function commitImport(
     const summary = await importProfiles(planImport(data, names));
     const history =
       summary.completions === 0 ? 'no history' : `${summary.completions} completed day(s)`;
+    // The counts are totals across everything the file brought in, so naming one
+    // profile beside them was a lie whenever the file held more than one.
+    const into =
+      summary.profiles === 1 ? `"${summary.name}"` : `${summary.profiles} new profiles`;
     return {
       ok: true,
-      message: `Imported ${summary.habits} habit(s) and ${history} into "${summary.name}".`,
+      message: `Imported ${summary.habits} habit(s) and ${history} into ${into}.`,
     };
   } catch (error) {
     console.error('Import failed:', error);

@@ -13,6 +13,7 @@ import { getActiveProfileId } from './db/profiles';
 import {
   cancelAlerts,
   cancelAllAlerts,
+  dismissAlerts,
   DONE_ACTION,
   ensureNotificationPermission,
   readPayload,
@@ -212,6 +213,9 @@ export async function cancelDayChain(habitId: number, day: string): Promise<void
     const ids = await notifIdsFor(habitId, day);
     if (ids.length > 0) {
       await cancelAlerts(ids);
+      // Cancelling only stops what has not fired. Anything already delivered is
+      // still in the shade offering a Done button for the habit just ticked.
+      await dismissAlerts(ids);
       await forgetNotifsFor(habitId, day);
     }
 

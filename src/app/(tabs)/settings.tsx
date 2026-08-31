@@ -14,10 +14,16 @@ import { eraseAllData, getActiveProfileId, resetProfile } from '@/lib/db/profile
 import { syncReminders } from '@/lib/reminders';
 import { GUTTER, spacing } from '@/lib/theme';
 
+/** The cards that can report an outcome, so it appears beside its own button. */
+type StatusCard = 'backup' | 'startOver';
+
 export default function SettingsScreen() {
-  // A single status line, announced when it changes. Screen readers otherwise
-  // miss the result of a backup entirely — the visible text just appears.
-  const [status, setStatus] = useState<string | null>(null);
+  // Which card the outcome belongs to, as well as what it said. A single line
+  // rendered in one fixed place put the result of "Erase all data" inside the
+  // Backup card, several hundred pixels above the button that was pressed and
+  // usually off the screen entirely — announced to a screen reader, invisible
+  // to everyone else.
+  const [status, setStatus] = useState<{ card: StatusCard; message: string } | null>(null);
   const [busy, setBusy] = useState(false);
   // Remounts the profile card after anything on this screen finishes. Importing,
   // restoring and erasing all change which profiles exist, and all three happen
@@ -26,7 +32,7 @@ export default function SettingsScreen() {
   const [reload, setReload] = useState(0);
 
   const run = useCallback(
-    (action: () => Promise<{ ok: boolean; message: string }>): void => {
+    (card: StatusCard, action: () => Promise<{ ok: boolean; message: string }>): void => {
       setBusy(true);
       setStatus(null);
       action()
@@ -34,12 +40,12 @@ export default function SettingsScreen() {
           // Whatever just happened may have replaced every habit on the device,
           // so what the OS has pending is no longer trustworthy.
           await syncReminders();
-          setStatus(result.message);
+          setStatus({ card, message: result.message });
           setReload((n) => n + 1);
         })
         .catch((error: unknown) => {
           console.error('Settings action failed:', error);
-          setStatus('Something went wrong.');
+          setStatus({ card, message: 'Something went wrong.' });
         })
         .finally(() => setBusy(false));
     },
@@ -52,7 +58,7 @@ export default function SettingsScreen() {
       'This replaces every profile, habit and completed day in the app with the contents of the backup file. It cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Replace', style: 'destructive', onPress: () => run(importBackup) },
+        { text: 'Replace', style: 'destructive', onPress: () => run('startOver', importBackup) },
       ]
     );
   };
@@ -67,7 +73,7 @@ export default function SettingsScreen() {
           text: 'Reset',
           style: 'destructive',
           onPress: () =>
-            run(async () => {
+            run('startOver', async () => {
               const profileId = await getActiveProfileId();
               await resetProfile(profileId);
               return { ok: true, message: 'Profile reset.' };
@@ -87,7 +93,7 @@ export default function SettingsScreen() {
           text: 'Erase everything',
           style: 'destructive',
           onPress: () =>
-            run(async () => {
+            run('startOver', async () => {
               await eraseAllData();
               return { ok: true, message: 'All data erased.' };
             }),
@@ -147,16 +153,16 @@ export default function SettingsScreen() {
             <Button
               label="Export backup"
               tone="secondary"
-              onPress={() => run(exportBackup)}
+              onPress={() => run('backup', exportBackup)}
               disabled={busy}
               accessibilityHint="Writes every profile, habit and completed day to a JSON file and opens the share sheet"
             />
           </View>
 
-          {status !== null && (
+          {status?.card === 'backup' && (
             // role="status" equivalent: announces the outcome without stealing focus.
             <Text tone="muted" accessibilityLiveRegion="polite">
-              {status}
+              {status.message}
             </Text>
           )}
         </Card>
@@ -209,6 +215,12 @@ export default function SettingsScreen() {
               accessibilityHint="Destroys every profile, habit and completed day on this device"
             />
           </View>
+
+          {status?.card === 'startOver' && (
+            <Text tone="muted" accessibilityLiveRegion="polite">
+              {status.message}
+            </Text>
+          )}
         </Card>
       </ScrollView>
     </Screen>

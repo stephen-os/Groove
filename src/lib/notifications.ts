@@ -157,6 +157,27 @@ export async function cancelAlerts(notificationIds: readonly string[]): Promise<
 }
 
 /** Clears every pending alert this app owns, before a full resync rebuilds them. */
+/**
+ * Clears alerts that have already been delivered and are sitting in the shade.
+ *
+ * Cancelling only removes what has not fired yet. A reminder that arrived at
+ * 07:00 stays in the notification drawer with its Done button until it is swiped
+ * away — so ticking the habit in the app left a notification behind offering to
+ * tick a habit that was already done.
+ *
+ * Failures are swallowed one at a time: an id the system has already forgotten
+ * is the normal case, not an error.
+ */
+export async function dismissAlerts(notificationIds: readonly string[]): Promise<void> {
+  for (const id of notificationIds) {
+    try {
+      await Notifications.dismissNotificationAsync(id);
+    } catch (error) {
+      console.warn('Failed to dismiss a delivered reminder:', error);
+    }
+  }
+}
+
 export async function cancelAllAlerts(): Promise<void> {
   try {
     await Notifications.cancelAllScheduledNotificationsAsync();

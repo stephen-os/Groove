@@ -79,16 +79,20 @@ const dayKey = z
     );
   }, 'Expected a real calendar day between 2000 and 2200.');
 
+// `min(1)` on both names. An empty name is not a thing the app can produce -
+// both forms require one - but it is a thing a hand-edited file can carry, and
+// since profile names are unique it would leave a profile that cannot be told
+// apart from anything, in a switcher whose entire job is telling them apart.
 const ProfileSchema = z.strictObject({
   id,
-  name: z.string().max(MAX_NAME),
+  name: z.string().min(1).max(MAX_NAME),
   createdAt: timestamp,
 });
 
 const HabitSchema = z.strictObject({
   id,
   profileId: id,
-  name: z.string().max(MAX_NAME),
+  name: z.string().min(1).max(MAX_NAME),
   icon: z.string().max(32),
   color: z.string().max(32),
   scheduleKind: z.enum(['daily', 'weekly', 'monthly']),
@@ -173,6 +177,15 @@ function referentialError(backup: Backup): string | null {
   const orphanHabit = backup.habits.find((habit) => !profileIds.has(habit.profileId));
   if (orphanHabit) {
     return `That backup has a habit ("${orphanHabit.name}") belonging to a profile it does not contain.`;
+  }
+
+  // Completion ids are inserted explicitly by `replaceData`, so a duplicate is a
+  // constraint failure part-way through a restore rather than a bad row that
+  // gets skipped. Checked here for the same reason as the other two: finding out
+  // after half the file has landed is far worse than refusing it.
+  const completionIds = new Set(backup.completions.map((completion) => completion.id));
+  if (completionIds.size !== backup.completions.length) {
+    return 'That backup has duplicate completions.';
   }
 
   const orphanCompletion = backup.completions.find(

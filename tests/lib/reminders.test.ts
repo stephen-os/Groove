@@ -27,6 +27,8 @@ interface Inspect {
   pending: () => { id: string; data: Record<string, unknown>; fireAt: number }[];
   ids: () => string[];
   reset: () => void;
+  /** Ids the app has asked to clear from the notification shade. */
+  dismissed: () => string[];
   refuse: (n: number) => void;
   setPermission: (next: { granted: boolean; canAskAgain: boolean }) => void;
   /** Freezes scheduling, so a sync can be caught mid-teardown. */
@@ -146,6 +148,25 @@ describe('cancelDayChain', () => {
     await api.setStatus(habit.id, todayKey(), 'done');
     await api.cancelDayChain(habit.id, todayKey());
     expect(alertsOn(habit.id)).toHaveLength(0);
+  });
+
+  // Cancelling only removes what has not fired. The 07:00 reminder that already
+  // arrived sits in the shade with its Done button until something clears it,
+  // so ticking the habit in the app left a notification offering to tick a habit
+  // that was already done.
+  it('clears what has already been delivered, not just what is pending', async () => {
+    const habit = await reminded('Teeth');
+    await api.syncReminders();
+    const armed = api.inspect.pending().filter((a) => a.data.habitId === habit.id);
+    expect(armed.length).toBeGreaterThan(0);
+
+    await api.setStatus(habit.id, todayKey(), 'done');
+    await api.cancelDayChain(habit.id, todayKey());
+
+    const dismissed = api.inspect.dismissed();
+    for (const alert of armed.filter((a) => a.data.day === todayKey())) {
+      expect(dismissed).toContain(alert.id);
+    }
   });
 
   it('leaves another habit alone', async () => {
