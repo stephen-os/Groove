@@ -213,5 +213,18 @@ export const fontSize = {
  */
 export const MIN_TOUCH_TARGET = 48;
 
+/**
+ * The gutter between content and the edge of the display.
+ *
+ * Belongs on a scroll view's *content*, not on the screen around it. A scroll
+ * view clips to its own bounds, so a card's shadow is sliced off at the list
+ * edge however wide the surrounding padding is — the light has to fall inside
+ * the scrolling area, not beside it.
+ *
+ * Wide enough to clear `depth.raised`, which throws five pixels out with a
+ * twelve-pixel blur.
+ */
+export const GUTTER = spacing.lg;
+
 /** Diameter of the circular icon bubbles that carry a habit's icon. */
 export const BUBBLE = 48;

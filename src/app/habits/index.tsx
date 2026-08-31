@@ -20,7 +20,7 @@ import { habitColor, habitIcon } from '@/lib/habit-style';
 import { getActiveProfileId } from '@/lib/db/profiles';
 import { syncReminders } from '@/lib/reminders';
 import { describeSchedule, groupByDueTime } from '@/lib/schedule';
-import { colors, MIN_TOUCH_TARGET, spacing } from '@/lib/theme';
+import { GUTTER, MIN_TOUCH_TARGET, colors, spacing } from '@/lib/theme';
 
 export default function ManageHabitsScreen() {
   const router = useRouter();
@@ -193,7 +193,7 @@ export default function ManageHabitsScreen() {
 }
 
 const styles = StyleSheet.create({
-  list: { gap: spacing.sm, paddingVertical: spacing.md },
+  list: { paddingHorizontal: GUTTER, gap: spacing.sm, paddingVertical: spacing.md },
   section: { marginTop: spacing.sm, letterSpacing: 1 },
   empty: { alignItems: 'center', gap: spacing.xs, paddingVertical: spacing.xl },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: MIN_TOUCH_TARGET },

@@ -27,7 +27,7 @@ import {
   paceLabel,
   weekRange,
 } from '@/lib/schedule';
-import { colors, MIN_TOUCH_TARGET, spacing } from '@/lib/theme';
+import { GUTTER, MIN_TOUCH_TARGET, colors, spacing } from '@/lib/theme';
 
 interface Row {
   readonly habit: Habit;
@@ -257,7 +257,7 @@ export default function TodayScreen() {
 }
 
 const styles = StyleSheet.create({
-  list: { gap: spacing.sm, paddingVertical: spacing.md },
+  list: { paddingHorizontal: GUTTER, gap: spacing.sm, paddingVertical: spacing.md },
   dateBar: {
     flexDirection: 'row',
     alignItems: 'center',

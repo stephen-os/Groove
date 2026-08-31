@@ -9,7 +9,7 @@ import { exportBackup, importBackup } from '@/lib/backup-file';
 import { eraseAllData, getActiveProfileId, resetProfile } from '@/lib/db/profiles';
 import { seedDemoData } from '@/lib/db/seed';
 import { syncReminders } from '@/lib/reminders';
-import { spacing } from '@/lib/theme';
+import { GUTTER, spacing } from '@/lib/theme';
 
 export default function SettingsScreen() {
   // A single status line, announced when it changes. Screen readers otherwise
@@ -208,6 +208,6 @@ export default function SettingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  content: { gap: spacing.md, paddingVertical: spacing.md },
+  content: { paddingHorizontal: GUTTER, gap: spacing.md, paddingVertical: spacing.md },
   actions: { gap: spacing.sm, marginTop: spacing.sm },
 });

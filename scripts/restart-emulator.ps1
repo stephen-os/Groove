@@ -9,11 +9,13 @@
 #   - The emulator display sleeps on its own timeout. adb input does not count
 #     as user activity, so an app launched behind it looks like a blank app.
 #
-# Optional: -Clear also drops Metro's cache, -Wipe also erases app data.
+# Every run is a fresh one by default: the app is uninstalled, the native
+# project is re-synced from app.json, and the build installs onto an empty
+# database. Pass -Keep to leave the installed app and its data alone.
 
 param(
   [switch]$Clear,
-  [switch]$Wipe,
+  [switch]$Keep,
   [string]$Avd = 'medium_phone',
   [string]$Package = 'com.stephen.groove'
 )
@@ -63,14 +65,23 @@ Step 'Keeping the display awake'
 Step 'Forwarding 8081 so the dev client reaches Metro over USB rather than the LAN'
 & $adb reverse tcp:8081 tcp:8081
 
-if ($Wipe) {
-  Step 'Erasing app data'
-  & $adb shell pm clear $Package
+$env:ANDROID_HOME = $sdk
+$env:Path = "$env:Path;$sdk\platform-tools"
+
+if (-not $Keep) {
+  Step 'Uninstalling, for a genuinely empty database'
+  & $adb uninstall $Package 2>&1 | Out-Null
+
+  # expo run:android only prebuilds when android/ is MISSING, so an app.json
+  # change never reaches an existing native project. That silently discarded a
+  # security setting for a whole day -- allowBackup stayed true on the device
+  # while app.json had said false since morning. Re-syncing every run is the
+  # only way the two cannot drift.
+  Step 'Re-syncing native config from app.json'
+  npx expo prebuild --platform android
 }
 
 Step 'Building, installing and launching'
-$env:ANDROID_HOME = $sdk
-$env:Path = "$env:Path;$sdk\platform-tools"
 if ($Clear) { $env:EXPO_RESET_CACHE = '1' }
 npm run android
 

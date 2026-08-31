@@ -1,16 +1,6 @@
 import { StyleSheet, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Surface } from '@/components/ui/Surface';
-import { spacing } from '@/lib/theme';
-
-/**
- * The gutter every screen keeps between its content and the display edge.
- *
- * Wide enough to clear the shadows: `depth.raised` throws five pixels out with
- * a twelve-pixel blur, so anything less than that leaves every card's highlight
- * sliced off against the side of the screen.
- */
-const GUTTER = spacing.lg;
 
 interface ScreenProps {
   children: React.ReactNode;
@@ -42,12 +32,11 @@ export function Screen({ children, edgeToEdgeBottom = false, style }: ScreenProp
         {
           paddingTop: insets.top,
           paddingBottom: edgeToEdgeBottom ? 0 : insets.bottom,
-          // Added to the gutter rather than assigned over it. `paddingLeft` and
-          // `paddingRight` beat `paddingHorizontal` whatever the order, so
-          // setting them to a portrait phone's zero insets would silently
-          // delete the gutter and run every card off both edges.
-          paddingLeft: GUTTER + insets.left,
-          paddingRight: GUTTER + insets.right,
+          // Only the safe-area insets. The gutter lives on each screen's
+          // scrolling content instead — a scroll view clips to its bounds, so
+          // padding out here would cut every card's shadow off at the edge.
+          paddingLeft: insets.left,
+          paddingRight: insets.right,
         },
         style,
       ]}

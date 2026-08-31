@@ -9,7 +9,7 @@ import { EVERY_DAY, WEEKDAYS } from '@/lib/date';
 import { HabitFace } from '@/components/pages/habit/HabitFace';
 import { DEFAULT_ICON, HABIT_COLORS, HABIT_EMOJI, HABIT_ICONS } from '@/lib/habit-style';
 import type { HabitInput, ScheduleKind } from '@/lib/db/habits';
-import { colors, depth, MIN_TOUCH_TARGET, radius, spacing } from '@/lib/theme';
+import { GUTTER, MIN_TOUCH_TARGET, colors, depth, radius, spacing } from '@/lib/theme';
 
 // Shared by the create and edit screens. Everything a habit's form owns lives
 // here so the two screens differ only in what they do with the result.
@@ -343,7 +343,7 @@ export function HabitForm({ initial, submitLabel, onSubmit }: HabitFormProps) {
 }
 
 const styles = StyleSheet.create({
-  content: { gap: spacing.md, paddingVertical: spacing.md },
+  content: { gap: spacing.md, paddingVertical: spacing.md, paddingHorizontal: GUTTER },
   group: { gap: spacing.xs },
   chips: { flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' },
   chip: {

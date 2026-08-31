@@ -19,7 +19,7 @@ import {
   rollingAverage,
   statsFor,
 } from '@/lib/stats';
-import { colors, MIN_TOUCH_TARGET, radius, spacing } from '@/lib/theme';
+import { GUTTER, MIN_TOUCH_TARGET, colors, radius, spacing } from '@/lib/theme';
 
 type PeriodKey = 'week' | 'month' | 'quarter';
 
@@ -208,7 +208,7 @@ export default function AnalyticsScreen() {
 }
 
 const styles = StyleSheet.create({
-  content: { gap: spacing.sm, paddingVertical: spacing.md },
+  content: { paddingHorizontal: GUTTER, gap: spacing.sm, paddingVertical: spacing.md },
   chips: { flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' },
   chip: {
     minHeight: MIN_TOUCH_TARGET,

@@ -26,7 +26,7 @@ import {
   paceLabel,
   weekRange,
 } from '@/lib/schedule';
-import { colors, MIN_TOUCH_TARGET, radius, spacing } from '@/lib/theme';
+import { GUTTER, MIN_TOUCH_TARGET, colors, radius, spacing } from '@/lib/theme';
 
 // Any past day is editable here. Archived habits are loaded too — a day in
 // March may have had habits on it that were retired since, and they still
@@ -286,7 +286,7 @@ export default function HistoryScreen() {
 }
 
 const styles = StyleSheet.create({
-  content: { gap: spacing.sm, paddingVertical: spacing.md },
+  content: { paddingHorizontal: GUTTER, gap: spacing.sm, paddingVertical: spacing.md },
   monthBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   monthButton: {
     minWidth: MIN_TOUCH_TARGET,
