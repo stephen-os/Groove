@@ -14,6 +14,7 @@ import {
   groupByDueTime,
   isEmpty,
   monthRange,
+  paceLabel,
   weekRange,
 } from '@/lib/schedule';
 
@@ -24,6 +25,7 @@ const MON = '2026-08-31';
 const TUE = '2026-09-01';
 const THU = '2026-09-03';
 const FRI = '2026-09-04';
+const SAT = '2026-09-05';
 const SUN = '2026-09-06';
 
 const MON_TO_THU = (1 << 1) | (1 << 2) | (1 << 3) | (1 << 4);
@@ -413,5 +415,81 @@ describe('groupByDueTime', () => {
 
   it('is empty for no rows', () => {
     expect(groupByDueTime([])).toEqual([]);
+  });
+});
+
+
+describe('paceLabel', () => {
+  // A flexible habit's row on a given day, which is the only way a PeriodEntry
+  // is ever built.
+  const pace = (
+    target: number,
+    completions: readonly Completion[],
+    day: string,
+    kind: 'weekly' | 'monthly' = 'weekly'
+  ): string => {
+    const gym = habit({ scheduleKind: kind, targetCount: target, id: 900 });
+    const rows = habitsDueOn(
+      [gym],
+      indexCompletions(completions.map((entry) => ({ ...entry, habitId: gym.id }))),
+      day
+    );
+    const [entry] = kind === 'weekly' ? rows.weekly : rows.monthly;
+    return paceLabel(entry, day);
+  };
+
+  it('leads with the count, so the row answers "how many" first', () => {
+    expect(pace(3, [], MON)).toBe('0/3 this week · on track');
+  });
+
+  it('says which period the count belongs to', () => {
+    // The 1st, not MON — MON is the 31st of August, where a monthly habit
+    // genuinely has one day left and gets told so.
+    expect(pace(3, [], TUE, 'monthly')).toBe('0/3 this month · on track');
+  });
+
+  it('reports a finished period as done', () => {
+    expect(pace(3, done(900, [MON, TUE, THU]), THU)).toBe('3/3 this week · done');
+  });
+
+  it('only calls you behind once the prorated pace says so', () => {
+    // Four of seven days gone, so one of three was expected.
+    expect(pace(3, [], THU)).toBe('0/3 this week · 1 behind');
+  });
+
+  // The rest of this block is the whole point of the function. One completion
+  // per day is a database constraint, so three-a-week with two days left is not
+  // "behind" — it is already lost, and a row that says "on track" right up to
+  // Sunday night is punishing a decision it never announced.
+
+  it('warns on the last day the target is still reachable', () => {
+    // Friday: three to go, three days left. Possible, but only just.
+    expect(pace(3, [], FRI)).toBe('0/3 this week · every day left');
+  });
+
+  it('says so plainly once the days no longer fit', () => {
+    expect(pace(3, [], SAT)).toBe('0/3 this week · 3 to go, 2 days left');
+  });
+
+  it('keeps the day count singular when there is one left', () => {
+    expect(pace(3, [], SUN)).toBe('0/3 this week · 3 to go, 1 day left');
+  });
+
+  it('counts today as spent once it has been ticked', () => {
+    // Sunday, ticked. The week is over and two were missed — there is no
+    // reading of this where two more are still possible.
+    expect(pace(3, done(900, [SUN]), SUN)).toBe('1/3 this week · out of days');
+  });
+
+  it('measures against the target skipping left behind', () => {
+    // Monday skipped, so two are owed, not three — and two of six days left is
+    // comfortable rather than a warning.
+    expect(pace(3, skip(900, [MON]), TUE)).toBe('0/2 this week · on track');
+  });
+
+  it('does not warn about days a past week already spent', () => {
+    // Looking back at Tuesday from the history editor: Thursday's completion is
+    // already recorded, so Thursday is not a chance still going begging.
+    expect(pace(3, done(900, [TUE, THU]), TUE)).toBe('2/3 this week · on track');
   });
 });

@@ -145,6 +145,15 @@ interface PeriodEntry {
   readonly count: number;
   /** The target after skipped days are deducted. */
   readonly target: number;
+  /**
+   * Days left in the period that could still take a completion.
+   *
+   * One completion per day is a database constraint, so a target is not merely
+   * a number to reach — it is a number of *days*, and once the days run short
+   * the target is gone whatever you do next. Carried on the entry because this
+   * is where the day-by-day statuses are already in hand.
+   */
+  readonly openDays: number;
 }
 
 export interface DueToday {
@@ -188,7 +197,8 @@ export function habitsDueOn(
     const target = effectiveTarget(habit, days, period);
     if (count >= target && !done && !skipped) continue;
 
-    const entry: PeriodEntry = { habit, done, skipped, count, target };
+    const openDays = countOpenDays(days, { from: day, to: period.to });
+    const entry: PeriodEntry = { habit, done, skipped, count, target, openDays };
     if (habit.scheduleKind === 'weekly') weekly.push(entry);
     else monthly.push(entry);
   }
@@ -226,6 +236,21 @@ export function expectedByNow(
   const elapsed = daysInRange({ from: start, to: end });
   const total = daysInRange(period);
   return Math.floor((target * elapsed) / total);
+}
+
+/**
+ * Days in a range with nothing recorded against them yet.
+ *
+ * Counted forwards from the day being looked at, so it means "chances left"
+ * rather than "days left": a day already ticked or skipped is spent, and in the
+ * history editor the days after the one selected have their answers already.
+ */
+function countOpenDays(days: DayStatuses | undefined, range: DayRange): number {
+  let open = 0;
+  for (let day = range.from; day <= range.to; day = addDays(day, 1)) {
+    if (!days?.has(day)) open += 1;
+  }
+  return open;
 }
 
 /** Anything carrying a habit — the shape `groupByDueTime` needs. */
@@ -294,19 +319,37 @@ export function describeSchedule(habit: Habit): string {
 /**
  * How a flexible habit's week or month is going, in words.
  *
- * Deliberately generous about the present and honest about the past: while the
- * period is still running it says what is left rather than what is missing, and
- * only calls you behind once the prorated pace says so.
+ * Leads with the count, because "1/3 this week" is the thing you actually want
+ * to know when you glance at the row, and no adjective replaces it.
+ *
+ * What follows it is deliberately generous about the present and honest about
+ * the arithmetic. Being "behind" is prorated, so a slow start is not a scolding.
+ * But a target of three with two days left is not behind — it is *over*, and
+ * saying "on track" until Sunday and then marking the week failed is punishing
+ * someone for a decision they were never told they had made. So the last day it
+ * could still be met is named, and after that the row says so plainly rather
+ * than pretending.
  */
 export function paceLabel(entry: PeriodEntry, today: DayKey): string {
+  const span = entry.habit.scheduleKind === 'weekly' ? 'this week' : 'this month';
+  const progress = `${entry.count}/${entry.target} ${span}`;
+
   const remaining = Math.max(0, entry.target - entry.count);
-  if (remaining === 0) return 'Done for the period';
+  if (remaining === 0) return `${progress} · done`;
+
+  if (remaining > entry.openDays) {
+    if (entry.openDays === 0) return `${progress} · out of days`;
+    return `${progress} · ${remaining} to go, ${plural(entry.openDays, 'day')} left`;
+  }
+  // The warning that has to arrive before the failure does: still possible, but
+  // only if nothing else is missed.
+  if (remaining === entry.openDays) return `${progress} · every day left`;
 
   const period = periodOf(entry.habit, today);
-  const expected = expectedByNow(entry.target, period, today);
-  const behind = expected - entry.count;
-  const left = `${remaining} to go`;
-
-  if (behind > 0) return `${left} · ${behind} behind`;
-  return `${left} · on track`;
+  const behind = expectedByNow(entry.target, period, today) - entry.count;
+  if (behind > 0) return `${progress} · ${behind} behind`;
+  return `${progress} · on track`;
 }
+
+const plural = (count: number, noun: string): string =>
+  `${count} ${noun}${count === 1 ? '' : 's'}`;
