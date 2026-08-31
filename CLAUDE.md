@@ -97,6 +97,14 @@ just read. Several of these look correct and fail at runtime.
   is a display concern and lives in `WEEKDAYS`, not in storage.
 - **Habits archive, they don't delete.** `archived_at` keeps their history in the
   statistics.
+- **`ON DELETE CASCADE` does not fire inside `withExclusiveTransactionAsync`.**
+  expo-sqlite runs those on a second connection it opens itself and never sets
+  `foreign_keys` on, and SQLite defaults that pragma OFF per connection — so
+  `client.ts`'s `PRAGMA foreign_keys = ON` covers the shared connection only, and the
+  pragma cannot be moved because SQLite ignores it inside a transaction. Delete children
+  explicitly, deepest first. This cost a restore-from-backup that aborted on
+  `UNIQUE habits.id` and a "delete profile" that orphaned habits into every future
+  export; `tests/lib/db/cascade.test.ts` pins all of it.
 - **Import adds, restore replaces, and the difference is structural.** `importProfiles`
   only ever *creates* profiles, so there is no existing profile for it to merge into and
   nothing it can overwrite; `replaceData` wipes the database and is reachable only from
@@ -117,6 +125,21 @@ just read. Several of these look correct and fail at runtime.
 - The **pure decisions** — which habits are due on a day, whether a backup is valid,
   what a completion rate is — are separated from the SQLite and file-system calls
   around them. Keep that split; it is what makes any of this testable without a device.
+
+### Testing the data layer
+
+`tests/support/expo-sqlite.ts` aliases `expo-sqlite` to Node's built-in SQLite, so
+`src/lib/db` runs its real SQL under `npm test`. Two things about it matter:
+
+- It opens a **second connection** for `withExclusiveTransactionAsync` and creates every
+  connection with `enableForeignKeyConstraints: false`, because Node turns foreign keys
+  on where SQLite leaves them off. Weaken either and the harness starts passing against
+  code that is broken on a device — the first draft did exactly that.
+- Tests get a fresh database via `vi.resetModules()` plus a dynamic import, because
+  `client.ts` memoises its connection at module scope.
+
+Anything that deletes rows, or relies on a constraint, belongs in a test here rather
+than in a hope.
 
 ### Security
 
