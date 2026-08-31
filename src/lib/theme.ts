@@ -50,6 +50,8 @@ const hue = {
   emberDim: '#c25a18',
   sage: '#5bd88a',
   rose: '#f98a8a',
+  roseLight: '#ffa3a3',
+  roseDark: '#e46b6b',
   amber: '#f2c94c',
 } as const;
 
@@ -127,6 +129,10 @@ export const gradients = {
   page: [slate.pageLight, slate.page, slate.pageDark] as const,
   surface: [slate.surfaceLight, slate.surfaceDark] as const,
   accent: [hue.emberLight, hue.emberDark] as const,
+  // Destructive controls need their own ramp. Without one they fell back to the
+  // surface ramp, whose opaque stops painted straight over the red fill and
+  // left "Erase all data" as dark text on a dark card.
+  danger: [hue.roseLight, hue.roseDark] as const,
 };
 
 /** Top-right to bottom-left, matching the direction `depth` throws its shadows. */

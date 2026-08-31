@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { HABIT_COLORS } from '@/lib/habit-style';
-import { colors, MIN_TOUCH_TARGET } from '@/lib/theme';
+import { DEFAULT_ICON, HABIT_COLORS, HABIT_EMOJI, HABIT_ICONS, isEmoji } from '@/lib/habit-style';
+import { colors, gradients, MIN_TOUCH_TARGET } from '@/lib/theme';
 
 // WCAG 2.1 relative luminance and contrast ratio. Small enough to keep here
 // rather than pull in a dependency, and having it in the test file means the
@@ -47,6 +47,13 @@ const textPairs: [string, string, string][] = [
   // readable label is dark, not the page colour.
   ['onAccent on accent', colors.onAccent, colors.accent],
   ['error on surface', colors.error, colors.surface],
+  // The destructive button's own label, which is the pairing that actually
+  // ships — asserting only error-on-surface let it render dark-on-dark.
+  ['onAccent on error', colors.onAccent, colors.error],
+  ['onAccent on the danger ramp start', colors.onAccent, gradients.danger[0]],
+  ['onAccent on the danger ramp end', colors.onAccent, gradients.danger[1]],
+  ['onAccent on the accent ramp start', colors.onAccent, gradients.accent[0]],
+  ['onAccent on the accent ramp end', colors.onAccent, gradients.accent[1]],
   ['success on surface', colors.success, colors.surface],
   ['warning on surface', colors.warning, colors.surface],
 ];
@@ -100,6 +107,23 @@ describe('habit tints', () => {
 
   it('offers distinct choices', () => {
     expect(new Set(HABIT_COLORS).size).toBe(HABIT_COLORS.length);
+  });
+});
+
+describe('habit faces', () => {
+  it('draws the default face as a glyph, not as its own name', () => {
+    // A DEFAULT_ICON outside HABIT_ICONS makes isEmoji true, and every habit
+    // that was never given a face renders the literal string in its bubble.
+    expect(HABIT_ICONS).toContain(DEFAULT_ICON);
+    expect(isEmoji(DEFAULT_ICON)).toBe(false);
+  });
+
+  it('treats every offered emoji as an emoji', () => {
+    for (const emoji of HABIT_EMOJI) expect(isEmoji(emoji)).toBe(true);
+  });
+
+  it('treats every offered glyph as a glyph', () => {
+    for (const icon of HABIT_ICONS) expect(isEmoji(icon)).toBe(false);
   });
 });
 

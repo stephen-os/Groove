@@ -14,7 +14,10 @@ export type DayKey = string;
 
 /** The local calendar day a given instant falls on. */
 export function toDayKey(date: Date): DayKey {
-  const year = date.getFullYear();
+  // Padded to four digits. Day keys are compared as strings throughout, and an
+  // unpadded '999-12-31' sorts *above* '1000-01-01' — which turns every loop
+  // that walks backwards to a start bound into an infinite one.
+  const year = String(date.getFullYear()).padStart(4, '0');
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;

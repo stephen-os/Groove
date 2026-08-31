@@ -122,6 +122,11 @@ export function currentStreak(
 ): number {
   const end = lastCountedDay(habit, today);
 
+  // A daily habit scheduled on no days has no opportunities to count, and the
+  // walk below would never reach its `break` — it would step back past year
+  // zero forever. The form forbids an empty mask; a restored backup need not.
+  if (habit.scheduleKind === 'daily' && habit.weekdayMask === 0) return 0;
+
   if (habit.scheduleKind === 'daily') {
     let streak = 0;
     let cursor = end;
@@ -164,6 +169,7 @@ export function longestStreak(
 ): number {
   const end = lastCountedDay(habit, today);
   if (end < habit.startsOn) return 0;
+  if (habit.scheduleKind === 'daily' && habit.weekdayMask === 0) return 0;
 
   let best = 0;
   let run = 0;

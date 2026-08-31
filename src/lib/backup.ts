@@ -54,7 +54,27 @@ export function tooLarge(bytes: number | null | undefined): boolean {
 // NaN and Infinity, which SQLite would store as NULL or reject.
 const timestamp = z.number().int().nonnegative();
 const id = z.number().int().positive();
-const dayKey = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected a YYYY-MM-DD day.');
+/**
+ * A real calendar day, not merely ten characters shaped like one.
+ *
+ * The shape check alone let '1000-01-01' and '2026-13-45' through, and a
+ * far-past start date is enough to make the statistics walk backwards for
+ * hundreds of thousands of iterations on the UI thread. The range is bounded at
+ * both ends because no honest Groove backup predates the app.
+ */
+const dayKey = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected a YYYY-MM-DD day.')
+  .refine((value) => {
+    const [year, month, day] = value.split('-').map(Number);
+    if (year < 2000 || year > 2200) return false;
+    const date = new Date(year, month - 1, day);
+    // Round-trips only if the components describe a day that exists: JavaScript
+    // silently rolls 31 February over into March.
+    return (
+      date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day
+    );
+  }, 'Expected a real calendar day between 2000 and 2200.');
 
 const ProfileSchema = z.strictObject({
   id,
@@ -70,7 +90,9 @@ const HabitSchema = z.strictObject({
   color: z.string().max(32),
   scheduleKind: z.enum(['daily', 'weekly', 'monthly']),
   // Seven bits, so anything outside 0–127 is not a week.
-  weekdayMask: z.number().int().min(0).max(127),
+  // At least one bit: a daily habit on no days is a habit that can never come
+  // due, and the loops that walk its schedule have no stopping condition.
+  weekdayMask: z.number().int().min(1).max(127),
   targetCount: z.number().int().min(1).max(366),
   dueTime: z
     .string()
@@ -96,7 +118,10 @@ const CompletionSchema = z.strictObject({
 const BackupSchema = z.strictObject({
   formatVersion: z.literal(BACKUP_FORMAT_VERSION),
   exportedAt: timestamp,
-  profiles: z.array(ProfileSchema).max(MAX_PROFILES),
+  // At least one profile. Every screen may assume one exists — schema.ts seeds
+  // it for exactly that reason — and a restore that left none would strand the
+  // app with getActiveProfileId throwing on every call.
+  profiles: z.array(ProfileSchema).min(1).max(MAX_PROFILES),
   habits: z.array(HabitSchema).max(MAX_HABITS),
   completions: z.array(CompletionSchema).max(MAX_COMPLETIONS),
 });

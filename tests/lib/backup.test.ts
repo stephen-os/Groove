@@ -180,9 +180,17 @@ describe('parseBackup referential integrity', () => {
     expectRejected(backup, 'duplicate habits');
   });
 
-  it('accepts an empty database', () => {
-    const empty = serializeBackup({ profiles: [], habits: [], completions: [] });
-    expect(parseBackup(empty).ok).toBe(true);
+  it('accepts a profile with nothing in it yet', () => {
+    const fresh = serializeBackup({ profiles: data.profiles, habits: [], completions: [] });
+    expect(parseBackup(fresh).ok).toBe(true);
+  });
+
+  it('refuses a backup with no profile at all', () => {
+    // Restoring one would delete every profile and insert none, leaving
+    // getActiveProfileId to throw on every call from then on — an app that
+    // cannot load any screen and has no way back except erasing everything.
+    const none = serializeBackup({ profiles: [], habits: [], completions: [] });
+    expect(parseBackup(none).ok).toBe(false);
   });
 });
 
@@ -222,5 +230,35 @@ describe('tooLarge', () => {
   it('leaves room for a maximal legitimate export', () => {
     // 200,000 completions of indented JSON come to roughly 28MB.
     expect(MAX_BACKUP_BYTES).toBeGreaterThan(29 * 1024 * 1024);
+  });
+});
+
+
+// The shape check alone let a far-past or impossible date through, and the
+// statistics walk day by day from startsOn.
+describe('parseBackup day validation', () => {
+  const withStart = (startsOn: string): Record<string, unknown> => {
+    const backup = validBackup();
+    (backup.habits as { startsOn: string }[])[0].startsOn = startsOn;
+    return backup;
+  };
+
+  it('refuses a year far in the past', () => {
+    expectRejected(withStart('1000-01-01'), 'not a valid backup');
+  });
+
+  it('refuses a day that does not exist', () => {
+    expectRejected(withStart('2026-02-31'), 'not a valid backup');
+    expectRejected(withStart('2026-13-01'), 'not a valid backup');
+  });
+
+  it('accepts a leap day in a leap year', () => {
+    expect(parseBackup(JSON.stringify(withStart('2028-02-29'))).ok).toBe(true);
+  });
+
+  it('refuses a habit scheduled on no days at all', () => {
+    const backup = validBackup();
+    (backup.habits as { weekdayMask: number }[])[0].weekdayMask = 0;
+    expectRejected(backup, 'not a valid backup');
   });
 });

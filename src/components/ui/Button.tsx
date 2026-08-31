@@ -17,10 +17,13 @@ interface ButtonProps {
   style?: ViewStyle;
 }
 
+// Each tone names its own ramp. Leaving danger to fall through to 'surface'
+// painted an opaque grey gradient over the red and made every destructive
+// button unreadable — and, worse, indistinguishable from a safe one.
 const FILLS = {
-  primary: { backgroundColor: colors.accent, color: colors.onAccent },
-  secondary: { backgroundColor: colors.surface, color: colors.fg },
-  danger: { backgroundColor: colors.error, color: colors.onAccent },
+  primary: { backgroundColor: colors.accent, color: colors.onAccent, ramp: 'accent' },
+  secondary: { backgroundColor: colors.surface, color: colors.fg, ramp: 'surface' },
+  danger: { backgroundColor: colors.error, color: colors.onAccent, ramp: 'danger' },
 } as const;
 
 /**
@@ -42,7 +45,7 @@ export function Button({
   accessibilityHint,
   style,
 }: ButtonProps) {
-  const { color, backgroundColor } = FILLS[tone];
+  const { color, backgroundColor, ramp } = FILLS[tone];
 
   return (
     <Pressable
@@ -62,7 +65,7 @@ export function Button({
     >
       {/* The label is centred in a full-height row so the touch target stays
           48dp even when the text itself is short. */}
-      <Surface ramp={tone === 'primary' ? 'accent' : 'surface'} style={[styles.fill, { backgroundColor }]}>
+      <Surface ramp={ramp} style={[styles.fill, { backgroundColor }]}>
         <View style={styles.content}>
           <Text variant="body" style={{ color, fontWeight: '700' }}>
             {label}

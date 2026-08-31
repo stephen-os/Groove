@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { Alert, Pressable, SectionList, StyleSheet, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { HabitFace } from '@/components/pages/habit/HabitFace';
 import { Bubble } from '@/components/ui/Bubble';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -128,10 +129,12 @@ export default function ManageHabitsScreen() {
                 style={styles.row}
               >
                 <Bubble size={40}>
-                  <Ionicons
-                    name={habitIcon(item.icon) as never}
+                  {/* HabitFace, not Ionicons: half the pickable faces are emoji
+                      and the icon font draws nothing at all for those. */}
+                  <HabitFace
+                    icon={habitIcon(item.icon)}
+                    tint={habitColor(item.color)}
                     size={18}
-                    color={habitColor(item.color)}
                   />
                 </Bubble>
                 <View style={styles.labels}>

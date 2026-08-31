@@ -15,6 +15,10 @@ import { colors } from './theme';
  * what a personal habit list actually contains.
  */
 export const HABIT_ICONS: readonly string[] = [
+  // First, and the default: a habit that has never been given a face gets this
+  // one, so it has to be a member of this list or `isEmoji` will mistake it for
+  // an emoji and render the name as text.
+  'ellipse-outline',
   'checkmark-circle-outline',
   'sunny-outline',
   'moon-outline',
@@ -50,7 +54,7 @@ export const HABIT_EMOJI: readonly string[] = [
   '🌙', '💰', '📞', '🌱', '🐕', '☕', '🚭', '🎨',
 ];
 
-export const DEFAULT_ICON = 'ellipse-outline';
+export const DEFAULT_ICON = HABIT_ICONS[0];
 
 /** Whether this face is drawn as text rather than through Ionicons. */
 export function isEmoji(icon: string): boolean {

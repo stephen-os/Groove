@@ -130,7 +130,14 @@ export default function HistoryScreen() {
     const date = fromDayKey(month.from);
     // Built as a Date rather than by adjusting the month number in the string,
     // which would produce month 0 or 13 at a year boundary.
-    setAnchor(toDayKey(new Date(date.getFullYear(), date.getMonth() + months, 1)));
+    const next = toDayKey(new Date(date.getFullYear(), date.getMonth() + months, 1));
+    setAnchor(next);
+
+    // The selected day has to move with the month. Leaving it behind renders a
+    // day whose completions are no longer loaded, so a fully ticked day shows
+    // as empty — and ticking it then deletes the rows it was hiding.
+    const range = monthRange(next);
+    setSelected(today >= range.from && today <= range.to ? today : range.from);
   };
 
   // Progress is attached where the shape is still known, rather than recovered
