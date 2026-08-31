@@ -22,9 +22,8 @@ import {
   habitsDueOn,
   indexCompletions,
   isEmpty,
-  monthRange,
   paceLabel,
-  weekRange,
+  windowFor,
 } from '@/lib/schedule';
 import { GUTTER, MIN_TOUCH_TARGET, colors, spacing } from '@/lib/theme';
 
@@ -41,7 +40,11 @@ export default function TodayScreen() {
   const [completions, setCompletions] = useState<Completion[]>([]);
   const [loaded, setLoaded] = useState(false);
 
-  const today = todayKey();
+  // Today is state, not a value recomputed each render. Recomputing it meant a
+  // screen left open across midnight still held yesterday in `day` while
+  // `today` had moved on: the next tap wrote the completion to yesterday, and
+  // only then did the re-render notice and lock the screen read-only.
+  const [today, setToday] = useState(todayKey);
   // The day being looked at. Only today can be changed; the rest is a read-only
   // look forward or back, so the screen answers "what does Thursday hold" as
   // well as "what is left now".
@@ -51,20 +54,20 @@ export default function TodayScreen() {
   // Weekly and monthly habits count completions across their whole period, and
   // a week can straddle a month boundary — so load the union of both ranges
   // rather than the month alone.
-  const range = useMemo(() => {
-    const week = weekRange(day);
-    const month = monthRange(day);
-    return {
-      from: week.from < month.from ? week.from : month.from,
-      to: week.to > month.to ? week.to : month.to,
-    };
-  }, [day]);
+  const range = useMemo(() => windowFor({ from: day, to: day }), [day]);
 
   // Reload on focus rather than on mount: returning from the habit screens has
-  // to show the change, and the tab stays mounted between visits.
+  // to show the change, and the tab stays mounted between visits. Focusing is
+  // also when the date is re-read, so a screen that sat open overnight catches
+  // up before anything can be written to the wrong day.
   useFocusEffect(
     useCallback(() => {
       let active = true;
+      const now = todayKey();
+      if (now !== today) {
+        setToday(now);
+        setDay(now);
+      }
       const load = async (): Promise<void> => {
         const profileId = await getActiveProfileId();
         const [rows, days] = await Promise.all([
@@ -83,7 +86,7 @@ export default function TodayScreen() {
       return () => {
         active = false;
       };
-    }, [range])
+    }, [range, today])
   );
 
   const due = useMemo(
@@ -117,31 +120,46 @@ export default function TodayScreen() {
 
   const mark = useCallback(
     (habit: Habit, next: CompletionStatus | null): void => {
-      const previous = completions;
+      // The row as it stands, so a failure restores this one habit rather than
+      // the whole array. Snapshotting everything reverted any *other* tick made
+      // while this write was in flight, on screen but not in the database.
+      const before = completions.find(
+        (entry) => entry.habitId === habit.id && entry.day === day
+      );
 
-      // Update first, persist after: a checkbox that waits on SQLite before it
+      const replace = (status: CompletionStatus | null): void => {
+        setCompletions((current) => {
+          const without = current.filter(
+            (entry) => !(entry.habitId === habit.id && entry.day === day)
+          );
+          return status === null
+            ? without
+            : [
+                ...without,
+                { id: -Date.now(), habitId: habit.id, day, status, doneAt: Date.now() },
+              ];
+        });
+      };
+
+      // Move first, persist after: a checkbox that waits on SQLite before it
       // moves feels broken. The id is a placeholder — nothing downstream reads
       // it, and the next focus reload replaces the row with the real one.
-      setCompletions((current) => {
-        const without = current.filter(
-          (entry) => !(entry.habitId === habit.id && entry.day === day)
-        );
-        return next === null
-          ? without
-          : [...without, { id: -Date.now(), habitId: habit.id, day, status: next, doneAt: Date.now() }];
-      });
+      replace(next);
 
-      // Having dealt with a habit — either way — silences the rest of today's
-      // chain immediately. Undoing has to put it back, which needs a full
-      // replan, so that takes the slower path.
-      if (next === null) void syncReminders();
-      else void cancelDayChain(habit.id, day);
-
-      setStatus(habit.id, day, next).catch((error: unknown) => {
-        console.error('Could not save that change:', error);
-        setCompletions(previous);
-        Alert.alert('Could not save that.');
-      });
+      setStatus(habit.id, day, next)
+        .then(() => {
+          // Only once the write is committed. Cancelling first meant a failed
+          // write left the alerts cancelled for a habit that is not done, and
+          // a resync that read the database before the write landed put the
+          // wrong alerts back.
+          if (next === null) return syncReminders();
+          return cancelDayChain(habit.id, day);
+        })
+        .catch((error: unknown) => {
+          console.error('Could not save that change:', error);
+          replace(before?.status ?? null);
+          Alert.alert('Could not save that.');
+        });
     },
     [completions, day]
   );

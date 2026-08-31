@@ -49,10 +49,10 @@ export async function replaceScheduledNotifs(
   notifs: readonly (ScheduledNotif & { fireAt: number })[]
 ): Promise<void> {
   const db = await getDatabase();
-  await db.withTransactionAsync(async () => {
-    await db.execAsync('DELETE FROM scheduled_notifs');
+  await db.withExclusiveTransactionAsync(async (txn) => {
+    await txn.execAsync('DELETE FROM scheduled_notifs');
     for (const notif of notifs) {
-      await db.runAsync(
+      await txn.runAsync(
         'INSERT INTO scheduled_notifs (habit_id, day, notification_id, fire_at) VALUES (?, ?, ?, ?)',
         [notif.habitId, notif.day, notif.notificationId, notif.fireAt]
       );

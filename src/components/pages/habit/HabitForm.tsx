@@ -78,6 +78,7 @@ export function HabitForm({ initial, submitLabel, onSubmit }: HabitFormProps) {
   const [targetPct, setTargetPct] = useState(initial.targetPct);
 
   const [nameError, setNameError] = useState<string | undefined>(undefined);
+  const [dayError, setDayError] = useState<string | undefined>(undefined);
   const [timeError, setTimeError] = useState<string | undefined>(undefined);
   const [saving, setSaving] = useState(false);
 
@@ -86,6 +87,7 @@ export function HabitForm({ initial, submitLabel, onSubmit }: HabitFormProps) {
     const trimmedTime = dueTime.trim();
 
     setNameError(undefined);
+    setDayError(undefined);
     setTimeError(undefined);
 
     if (trimmedName.length === 0) {
@@ -93,7 +95,11 @@ export function HabitForm({ initial, submitLabel, onSubmit }: HabitFormProps) {
       return;
     }
     if (kind === 'daily' && weekdayMask === 0) {
-      setNameError('Pick at least one day.');
+      // Its own message, announced by the day group rather than by the name
+      // field — TextField reads its error as that field's problem, so routing
+      // this through it told a screen-reader user their habit's *name* was
+      // wrong.
+      setDayError('Pick at least one day.');
       return;
     }
     if (trimmedTime.length > 0 && !TIME_PATTERN.test(trimmedTime)) {
@@ -154,7 +160,7 @@ export function HabitForm({ initial, submitLabel, onSubmit }: HabitFormProps) {
                 accessibilityState={{ checked: selected }}
                 accessibilityLabel={option.replace(/-outline$/, '').replace(/-/g, ' ')}
               >
-                <Bubble accent={selected} size={44}>
+                <Bubble accent={selected} size={MIN_TOUCH_TARGET}>
                   <HabitFace
                     icon={option}
                     tint={selected ? colors.onAccent : color}
@@ -219,6 +225,11 @@ export function HabitForm({ initial, submitLabel, onSubmit }: HabitFormProps) {
           <Text variant="caption" tone="muted">
             Days
           </Text>
+          {dayError !== undefined && (
+            <Text variant="caption" tone="error" accessibilityLiveRegion="polite">
+              {dayError}
+            </Text>
+          )}
           <View style={styles.chips}>
             {WEEKDAYS.map((weekday) => {
               const selected = (weekdayMask & (1 << weekday.bit)) !== 0;
@@ -365,8 +376,10 @@ const styles = StyleSheet.create({
   },
   swatch: {
     ...bevelRound,
-    width: 44,
-    height: 44,
+    // 48, not 44: the app's own minimum, and these are the smallest things on
+    // the screen that have to be hit accurately.
+    width: MIN_TOUCH_TARGET,
+    height: MIN_TOUCH_TARGET,
     borderRadius: radius.full,
     alignItems: 'center',
     justifyContent: 'center',

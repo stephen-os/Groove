@@ -58,16 +58,24 @@ export async function exportData(): Promise<GrooveData> {
  * are cleared in the right order without saying so. The scheduled notifications
  * go too — they point at habits that no longer exist, and the caller reschedules
  * from scratch afterwards.
+ *
+ * Exclusive, not `withTransactionAsync`. That one is a bare BEGIN/COMMIT on the
+ * app's single shared connection, so a second transaction starting while this
+ * one runs fails on SQLite's "cannot start a transaction within a transaction"
+ * — and expo-sqlite's handler answers by issuing ROLLBACK, which ends *this*
+ * transaction, not the one that failed. Restoring a backup backgrounds the app
+ * to pick the file, and returning fires a reminder resync that does exactly
+ * that, half way through the restore.
  */
 export async function replaceData(data: GrooveData): Promise<void> {
   const db = await getDatabase();
 
-  await db.withTransactionAsync(async () => {
-    await db.execAsync('DELETE FROM scheduled_notifs');
-    await db.execAsync('DELETE FROM profiles');
+  await db.withExclusiveTransactionAsync(async (txn) => {
+    await txn.execAsync('DELETE FROM scheduled_notifs');
+    await txn.execAsync('DELETE FROM profiles');
 
     for (const profile of data.profiles) {
-      await db.runAsync('INSERT INTO profiles (id, name, created_at) VALUES (?, ?, ?)', [
+      await txn.runAsync('INSERT INTO profiles (id, name, created_at) VALUES (?, ?, ?)', [
         profile.id,
         profile.name,
         profile.createdAt,
@@ -75,7 +83,7 @@ export async function replaceData(data: GrooveData): Promise<void> {
     }
 
     for (const habit of data.habits) {
-      await db.runAsync(
+      await txn.runAsync(
         `INSERT INTO habits (
            id, profile_id, name, icon, color, schedule_kind,
            weekday_mask, target_count, due_time, remind_enabled, follow_ups,
@@ -103,7 +111,7 @@ export async function replaceData(data: GrooveData): Promise<void> {
     }
 
     for (const completion of data.completions) {
-      await db.runAsync(
+      await txn.runAsync(
         'INSERT INTO completions (id, habit_id, day, status, done_at) VALUES (?, ?, ?, ?, ?)',
         [completion.id, completion.habitId, completion.day, completion.status, completion.doneAt]
       );
@@ -113,7 +121,7 @@ export async function replaceData(data: GrooveData): Promise<void> {
     // imported one so the app opens on something real.
     const active = data.profiles[0]?.id;
     if (active !== undefined) {
-      await db.runAsync(
+      await txn.runAsync(
         `INSERT INTO settings (key, value) VALUES ('activeProfileId', ?)
          ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
         [String(active)]

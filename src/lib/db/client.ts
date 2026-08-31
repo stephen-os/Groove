@@ -35,6 +35,9 @@ async function connect(): Promise<SQLiteDatabase> {
     await deleteDatabaseAsync(DATABASE_NAME);
     db = await openDatabaseAsync(DATABASE_NAME);
 
+    // Not exclusive, and safe: nothing else can be issuing SQL yet. Callers all
+    // await the single memoised `connect()` promise, so this runs before the
+    // connection is visible to anyone.
     await db.withTransactionAsync(async () => {
       for (const statement of SCHEMA) {
         await db.execAsync(statement);
@@ -60,8 +63,18 @@ async function connect(): Promise<SQLiteDatabase> {
   return db;
 }
 
-/** The shared, ready database. Safe to call from anywhere, including in parallel. */
+/**
+ * The shared, ready database. Safe to call from anywhere, including in parallel.
+ *
+ * A failure clears the memo. Holding on to a rejected promise meant one
+ * transient problem — a locked file mid-rebuild, a bad statement — rejected
+ * every later call for the life of the process, and since most callers only
+ * warn, the app went quietly empty rather than saying anything.
+ */
 export function getDatabase(): Promise<SQLiteDatabase> {
-  connection ??= connect();
+  connection ??= connect().catch((error: unknown) => {
+    connection = null;
+    throw error;
+  });
   return connection;
 }

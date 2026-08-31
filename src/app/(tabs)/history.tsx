@@ -25,6 +25,7 @@ import {
   monthRange,
   paceLabel,
   weekRange,
+  windowFor,
 } from '@/lib/schedule';
 import { GUTTER, MIN_TOUCH_TARGET, colors, radius, spacing } from '@/lib/theme';
 
@@ -57,6 +58,11 @@ export default function HistoryScreen() {
     [month]
   );
 
+  // Wider than the grid. A monthly habit on a leading cell is measured against
+  // the whole of the previous month, so loading only what is on screen made a
+  // met target read as outstanding and dragged those days' bars down.
+  const window = useMemo(() => windowFor(grid), [grid]);
+
   useFocusEffect(
     useCallback(() => {
       let active = true;
@@ -64,7 +70,7 @@ export default function HistoryScreen() {
         const profileId = await getActiveProfileId();
         const [rows, days] = await Promise.all([
           listHabitsWithArchived(profileId),
-          completionsBetween(grid.from, grid.to),
+          completionsBetween(window.from, window.to),
         ]);
         if (!active) return;
         setHabits(rows);
@@ -74,7 +80,7 @@ export default function HistoryScreen() {
       return () => {
         active = false;
       };
-    }, [grid])
+    }, [window])
   );
 
   const index = useMemo(() => indexCompletions(completions), [completions]);
@@ -102,17 +108,25 @@ export default function HistoryScreen() {
 
   const mark = useCallback(
     (habitId: number, next: CompletionStatus | null): void => {
-      setCompletions((current) => {
-        const without = current.filter(
-          (entry) => !(entry.habitId === habitId && entry.day === selected)
-        );
-        return next === null
-          ? without
-          : [
-              ...without,
-              { id: -Date.now(), habitId, day: selected, status: next, doneAt: Date.now() },
-            ];
-      });
+      const before = completions.find(
+        (entry) => entry.habitId === habitId && entry.day === selected
+      );
+
+      const replace = (status: CompletionStatus | null): void => {
+        setCompletions((current) => {
+          const without = current.filter(
+            (entry) => !(entry.habitId === habitId && entry.day === selected)
+          );
+          return status === null
+            ? without
+            : [
+                ...without,
+                { id: -Date.now(), habitId, day: selected, status, doneAt: Date.now() },
+              ];
+        });
+      };
+
+      replace(next);
 
       setStatus(habitId, selected, next)
         // Editing a past day can change what is still due today — a weekly
@@ -120,10 +134,14 @@ export default function HistoryScreen() {
         .then(syncReminders)
         .catch((error: unknown) => {
           console.error('Could not save that change:', error);
+          // Put the row back. Without this a failed write left a tick on screen
+          // that nothing would correct: this screen only reloads when the month
+          // changes, so the false state survived every further interaction.
+          replace(before?.status ?? null);
           Alert.alert('Could not save that change.');
         });
     },
-    [selected]
+    [completions, selected]
   );
 
   const shiftMonth = (months: number): void => {
@@ -299,7 +317,9 @@ const styles = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
   cell: {
     width: `${100 / 7}%`,
-    height: 46,
+    // The app's minimum. Seven of these across a phone is already tight, and a
+    // date that needs two attempts to tap is the worst kind of near-miss.
+    height: MIN_TOUCH_TARGET,
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.xs,

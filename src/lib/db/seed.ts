@@ -87,11 +87,11 @@ export async function seedDemoData(): Promise<{ habits: number; completions: num
 
   let completions = 0;
 
-  await db.withTransactionAsync(async () => {
-    await db.runAsync('DELETE FROM habits WHERE profile_id = ?', [profileId]);
+  await db.withExclusiveTransactionAsync(async (txn) => {
+    await txn.runAsync('DELETE FROM habits WHERE profile_id = ?', [profileId]);
 
     for (const [index, template] of TEMPLATES.entries()) {
-      const result = await db.runAsync(
+      const result = await txn.runAsync(
         `INSERT INTO habits (
            profile_id, name, icon, color, schedule_kind, weekday_mask, target_count,
            due_time, remind_enabled, follow_ups, target_pct, starts_on,
@@ -128,8 +128,16 @@ export async function seedDemoData(): Promise<{ habits: number; completions: num
         if (template.scheduleKind === 'daily' && !maskIncludes(template.weekdayMask, day)) {
           continue;
         }
-        // Flexible habits get a couple of days a week rather than every day.
-        if (template.scheduleKind !== 'daily' && offset % 3 !== 0) continue;
+        // A flexible habit gets roughly its target, not a completion every
+        // third day. `offset % 3` gave a 1x-per-week habit two or three
+        // sessions and a 2x-per-month habit eight — and since `tally` caps done
+        // at the target, both rendered a flawless 100% with unbroken streaks,
+        // which is the one thing demo data must not do.
+        if (template.scheduleKind !== 'daily') {
+          const period = template.scheduleKind === 'weekly' ? 7 : 30;
+          const spacing = Math.floor(period / template.targetCount);
+          if (offset % spacing !== 0) continue;
+        }
 
         const roll = jitter(index, offset);
         // A fifth of whatever miss probability is left becomes a deliberate
@@ -142,13 +150,13 @@ export async function seedDemoData(): Promise<{ habits: number; completions: num
         // data that could not show a miss at all.
         const skipBelow = template.rate + (1 - template.rate) * 0.2;
         if (roll < template.rate) {
-          await db.runAsync(
+          await txn.runAsync(
             'INSERT INTO completions (habit_id, day, status, done_at) VALUES (?, ?, ?, ?)',
             [habitId, day, 'done', now]
           );
           completions += 1;
         } else if (roll < skipBelow) {
-          await db.runAsync(
+          await txn.runAsync(
             'INSERT INTO completions (habit_id, day, status, done_at) VALUES (?, ?, ?, ?)',
             [habitId, day, 'skipped', now]
           );

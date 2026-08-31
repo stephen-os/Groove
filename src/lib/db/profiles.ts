@@ -106,13 +106,20 @@ export async function deleteProfile(id: number): Promise<void> {
     throw new Error('The last profile cannot be deleted.');
   }
 
-  await db.withTransactionAsync(async () => {
-    await db.runAsync('DELETE FROM profiles WHERE id = ?', [id]);
-    await db.runAsync(
-      `INSERT INTO settings (key, value) VALUES ('activeProfileId', ?)
-       ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
-      [String(others[0].id)]
-    );
+  // Only move the active profile if the one being deleted *was* active.
+  // Reassigning unconditionally walked the user off a profile they had not
+  // touched, every time they tidied up a different one.
+  const active = await getActiveProfileId();
+
+  await db.withExclusiveTransactionAsync(async (txn) => {
+    await txn.runAsync('DELETE FROM profiles WHERE id = ?', [id]);
+    if (active === id) {
+      await txn.runAsync(
+        `INSERT INTO settings (key, value) VALUES ('activeProfileId', ?)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+        [String(others[0].id)]
+      );
+    }
   });
 }
 
@@ -124,6 +131,7 @@ export async function deleteProfile(id: number): Promise<void> {
  */
 export async function resetProfile(id: number): Promise<void> {
   const db = await getDatabase();
+  // One statement, so it is already atomic — no transaction to open.
   await db.runAsync('DELETE FROM habits WHERE profile_id = ?', [id]);
 }
 
@@ -135,13 +143,13 @@ export async function resetProfile(id: number): Promise<void> {
  */
 export async function eraseAllData(): Promise<void> {
   const db = await getDatabase();
-  await db.withTransactionAsync(async () => {
-    await db.execAsync('DELETE FROM profiles');
-    const result = await db.runAsync('INSERT INTO profiles (name, created_at) VALUES (?, ?)', [
+  await db.withExclusiveTransactionAsync(async (txn) => {
+    await txn.execAsync('DELETE FROM profiles');
+    const result = await txn.runAsync('INSERT INTO profiles (name, created_at) VALUES (?, ?)', [
       'Personal',
       Date.now(),
     ]);
-    await db.runAsync(
+    await txn.runAsync(
       `INSERT INTO settings (key, value) VALUES ('activeProfileId', ?)
        ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
       [String(result.lastInsertRowId)]

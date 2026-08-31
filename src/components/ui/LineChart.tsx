@@ -1,4 +1,5 @@
-import { StyleSheet, View } from 'react-native';
+import { useState } from 'react';
+import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 import Svg, { Circle, Defs, LinearGradient, Path, Stop, Line as SvgLine } from 'react-native-svg';
 import { Text } from '@/components/ui/Text';
 import {
@@ -37,10 +38,19 @@ export function LineChart({
   tint = colors.accent,
   accessibilityLabel,
 }: LineChartProps) {
-  // A viewBox in fixed units with preserveAspectRatio off means the chart
-  // stretches to whatever width it is given without any measurement pass.
+  // Measured rather than assumed. A fixed viewBox has to be fitted to the real
+  // width somehow, and both ways out are wrong: the default letterboxes it, so
+  // the drawing ends up shorter than the box the axis labels are laid out
+  // against and every label drifts off its gridline; `preserveAspectRatio` set
+  // to none stretches x instead, which turns the endpoint dot into an ellipse.
+  // A viewBox in real pixels is 1:1, so neither happens.
+  const [width, setWidth] = useState(0);
+  const onLayout = (event: LayoutChangeEvent): void => {
+    setWidth(Math.round(event.nativeEvent.layout.width));
+  };
+
   const box: PlotBox = {
-    width: 320,
+    width,
     height: HEIGHT,
     padLeft: 34,
     padRight: 8,
@@ -59,15 +69,18 @@ export function LineChart({
 
   if (points.length === 0) {
     return (
-      <View style={styles.empty}>
+      <View style={styles.empty} onLayout={onLayout}>
         <Text tone="muted">Not enough history yet.</Text>
       </View>
     );
   }
 
+  // Nothing to draw until the first layout pass reports a width.
+  if (width === 0) return <View style={styles.empty} onLayout={onLayout} />;
+
   return (
-    <View accessibilityRole="image" accessibilityLabel={accessibilityLabel}>
-      <Svg width="100%" height={HEIGHT} viewBox={`0 0 ${box.width} ${box.height}`}>
+    <View accessibilityRole="image" accessibilityLabel={accessibilityLabel} onLayout={onLayout}>
+      <Svg width={width} height={HEIGHT} viewBox={`0 0 ${width} ${HEIGHT}`}>
         <Defs>
           <LinearGradient id="under" x1="0" y1="0" x2="0" y2="1">
             <Stop offset="0" stopColor={tint} stopOpacity={0.35} />
@@ -105,9 +118,14 @@ export function LineChart({
       {/* Axis labels are React Native text, not SVG text: they inherit the
           app's font and honour the system font-size setting, which SVG text
           does not. */}
-      <View style={styles.yAxis} pointerEvents="none">
-        {[...ticks].reverse().map((tick) => (
-          <Text key={tick} variant="caption" tone="muted" style={styles.yLabel}>
+      <View style={StyleSheet.absoluteFill} pointerEvents="none">
+        {ticks.map((tick) => (
+          <Text
+            key={tick}
+            variant="caption"
+            tone="muted"
+            style={[styles.yLabel, { top: yFor(tick, box, domain) - 8 }]}
+          >
             {tick}%
           </Text>
         ))}
@@ -126,18 +144,15 @@ export function LineChart({
 
 const styles = StyleSheet.create({
   empty: { height: HEIGHT, alignItems: 'center', justifyContent: 'center' },
-  yAxis: {
+  // Each label is placed at its own gridline's y, rather than spaced evenly
+  // down a fixed-height column. The old way assumed five labels always fit in
+  // 190dp; at a large system font size they overflowed and collapsed into each
+  // other, which is exactly the setting the app is not allowed to break.
+  yLabel: {
     position: 'absolute',
     left: 0,
-    top: 0,
-    height: HEIGHT,
-    // Matches the chart's own top and bottom padding so each label lines up
-    // with the gridline it belongs to.
-    paddingTop: 2,
-    paddingBottom: 20,
-    justifyContent: 'space-between',
+    fontVariant: ['tabular-nums'],
   },
-  yLabel: { fontVariant: ['tabular-nums'] },
   xAxis: {
     flexDirection: 'row',
     justifyContent: 'space-between',

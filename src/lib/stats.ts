@@ -97,7 +97,16 @@ function tally(
     // Completions are counted across the whole period, not just the slice of it
     // inside the range — a target is met by the week, not by the query window.
     const count = countStatus(days, period, 'done');
-    const target = expectedByNow(effectiveTarget(habit, days, period), period, today);
+    // Prorated against the habit's own last day in this period, not against
+    // today. A habit that started on a Saturday owes that week two days of its
+    // target, not seven — charging the full three for two days it existed made
+    // a habit completed *every day it was alive* score 83%.
+    const target = expectedByNow(
+      effectiveTarget(habit, days, period),
+      period,
+      lastCountedDay(habit, today) < today ? lastCountedDay(habit, today) : today,
+      habit.startsOn
+    );
     scheduled += target;
     // Capped at the target so an unusually good week cannot pay for a bad one.
     done += Math.min(count, target);
@@ -318,7 +327,10 @@ export function dailyRates(
  */
 export function rollingAverage(rates: readonly DayRate[], window: number): number[] {
   const out: number[] = [];
-  let last = 0;
+  // The first scheduled day's own value, used for any quiet run before it.
+  // Starting at zero drew a leading cliff from nothing to the real rate, which
+  // an axis fitted to its data then stretched all the way to the floor.
+  let last = rates.find((entry) => entry.pct !== null)?.pct ?? 0;
 
   rates.forEach((_rate, index) => {
     const from = Math.max(0, index - window + 1);

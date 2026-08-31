@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  addDays,
+  atTimeOn,
   EVERY_DAY,
   fromDayKey,
   maskIncludes,
@@ -113,5 +115,80 @@ describe('WEEKDAYS', () => {
   it('covers exactly the bits EVERY_DAY sets', () => {
     const combined = WEEKDAYS.reduce((mask, weekday) => mask | (1 << weekday.bit), 0);
     expect(combined).toBe(EVERY_DAY);
+  });
+});
+
+
+// addDays drives every loop in the codebase and atTimeOn places every reminder,
+// and neither had a test until a padding bug in toDayKey turned a backwards
+// walk into an infinite one.
+describe('addDays', () => {
+  it('moves forward and back', () => {
+    expect(addDays('2026-08-30', 1)).toBe('2026-08-31');
+    expect(addDays('2026-08-30', -1)).toBe('2026-08-29');
+  });
+
+  it('rolls over a month end', () => {
+    expect(addDays('2026-08-31', 1)).toBe('2026-09-01');
+    expect(addDays('2026-09-01', -1)).toBe('2026-08-31');
+  });
+
+  it('rolls over a year end', () => {
+    expect(addDays('2026-12-31', 1)).toBe('2027-01-01');
+    expect(addDays('2027-01-01', -1)).toBe('2026-12-31');
+  });
+
+  it('crosses a leap day', () => {
+    expect(addDays('2028-02-28', 1)).toBe('2028-02-29');
+    expect(addDays('2028-02-29', 1)).toBe('2028-03-01');
+  });
+
+  it('skips 29 February in a non-leap year', () => {
+    expect(addDays('2026-02-28', 1)).toBe('2026-03-01');
+  });
+
+  it('always moves in the direction asked, which the loops depend on', () => {
+    // A backwards step that sorts *above* where it started is an infinite loop
+    // in every walk that stops at a start bound.
+    let day = '2026-01-05';
+    for (let step = 0; step < 400; step += 1) {
+      const previous = addDays(day, -1);
+      expect(previous < day).toBe(true);
+      day = previous;
+    }
+  });
+
+  it('keeps four-digit years so string comparison stays chronological', () => {
+    expect(addDays('2000-01-01', -1)).toBe('1999-12-31');
+    expect('1999-12-31' < '2000-01-01').toBe(true);
+  });
+});
+
+describe('atTimeOn', () => {
+  it('places a wall-clock time on a day, in local time', () => {
+    const at = atTimeOn('2026-08-30', '07:00');
+    expect(at.getFullYear()).toBe(2026);
+    expect(at.getMonth()).toBe(7);
+    expect(at.getDate()).toBe(30);
+    expect(at.getHours()).toBe(7);
+    expect(at.getMinutes()).toBe(0);
+  });
+
+  it('handles midnight and the last minute of the day', () => {
+    expect(atTimeOn('2026-08-30', '00:00').getHours()).toBe(0);
+    expect(atTimeOn('2026-08-30', '23:59').getHours()).toBe(23);
+  });
+
+  it('stays on the day it was given', () => {
+    for (const time of ['00:00', '07:00', '12:30', '23:59']) {
+      expect(toDayKey(atTimeOn('2026-08-30', time))).toBe('2026-08-30');
+    }
+  });
+
+  it('keeps the wall clock across a spring-forward date', () => {
+    // 7am is 7am whatever the offset did overnight — the whole reason times are
+    // stored as wall clock rather than as an instant.
+    const at = atTimeOn('2027-03-14', '07:00');
+    expect(at.getHours()).toBe(7);
   });
 });

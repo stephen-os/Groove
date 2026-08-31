@@ -55,6 +55,27 @@ export function monthRange(day: DayKey): DayRange {
   return { from: toDayKey(start), to: toDayKey(end) };
 }
 
+/**
+ * The completion window `habitsDueOn` needs to answer correctly for `range`.
+ *
+ * A flexible habit counts across its whole week or month, so asking about a day
+ * requires every completion in the periods that day belongs to — not merely the
+ * days on screen. Two callers guessed at this independently and one guessed
+ * wrong: the history grid loaded only its calendar span, so a monthly habit on
+ * a leading cell was measured against a July it had only seen the tail of, and
+ * days that were in fact complete rendered as missed.
+ *
+ * Every caller asks here instead.
+ */
+export function windowFor(range: DayRange): DayRange {
+  const starts = [weekRange(range.from).from, monthRange(range.from).from];
+  const ends = [weekRange(range.to).to, monthRange(range.to).to];
+  return {
+    from: starts.reduce((a, b) => (a < b ? a : b)),
+    to: ends.reduce((a, b) => (a > b ? a : b)),
+  };
+}
+
 /** The period a flexible habit is measured over. */
 export function periodOf(habit: Habit, day: DayKey): DayRange {
   return habit.scheduleKind === 'weekly' ? weekRange(day) : monthRange(day);
@@ -188,11 +209,23 @@ export function isEmpty(due: DueToday): boolean {
  * Tuesday, one by Wednesday, two by Friday. Rounding up instead would mark you
  * behind on the first morning of every week.
  */
-export function expectedByNow(target: number, period: DayRange, today: DayKey): number {
-  if (today >= period.to) return target;
-  if (today < period.from) return 0;
-  const elapsed = daysInRange({ from: period.from, to: today });
-  return Math.floor((target * elapsed) / daysInRange(period));
+export function expectedByNow(
+  target: number,
+  period: DayRange,
+  today: DayKey,
+  /** The first day the habit existed, if it began part-way through. */
+  from: DayKey = period.from
+): number {
+  // A period the habit only partly lived through owes only the days it was
+  // there for, at both ends: one it started inside, and one it was archived in.
+  const start = from > period.from ? from : period.from;
+  if (start > period.to) return 0;
+  if (today < start) return 0;
+
+  const end = today < period.to ? today : period.to;
+  const elapsed = daysInRange({ from: start, to: end });
+  const total = daysInRange(period);
+  return Math.floor((target * elapsed) / total);
 }
 
 /** Anything carrying a habit — the shape `groupByDueTime` needs. */

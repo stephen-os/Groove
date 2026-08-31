@@ -22,6 +22,18 @@ type Startup = { status: 'loading' } | { status: 'ready' } | { status: 'failed';
 export default function RootLayout() {
   const [startup, setStartup] = useState<Startup>({ status: 'loading' });
 
+  // Registered at module scope, not inside an effect gated on startup. A Done
+  // tap that arrives while the process is dead is drained when the notification
+  // registry initialises, which happens well before the database has opened —
+  // a listener added after that never sees it, so the habit stays unticked and
+  // its follow-ups keep arriving.
+  useEffect(() => {
+    const responses = Notifications.addNotificationResponseReceivedListener((response) => {
+      void handleReminderResponse(response);
+    });
+    return () => responses.remove();
+  }, []);
+
   useEffect(() => {
     const prepare = async (): Promise<void> => {
       try {
@@ -29,7 +41,15 @@ export default function RootLayout() {
         // date. If this throws, the app has no usable storage and there is
         // nothing sensible to render.
         await getDatabase();
-        await configureNotifications();
+
+        // Outside the try that decides the fatal screen. A rejected channel or
+        // category costs reminders, not storage, and telling someone to
+        // reinstall — losing their history — over it would be a lie as well as
+        // a disaster.
+        void configureNotifications().catch((error: unknown) => {
+          console.warn('Could not configure notifications:', error);
+        });
+
         setStartup({ status: 'ready' });
       } catch (error) {
         console.error('Startup failed:', error);
@@ -57,16 +77,7 @@ export default function RootLayout() {
       if (next === 'active') void syncReminders();
     });
 
-    // Fires when a reminder's Done or Snooze button is tapped, including while
-    // the app is in the background.
-    const responses = Notifications.addNotificationResponseReceivedListener((response) => {
-      void handleReminderResponse(response);
-    });
-
-    return () => {
-      appState.remove();
-      responses.remove();
-    };
+    return () => appState.remove();
   }, [startup.status]);
 
   if (startup.status === 'loading') return null;

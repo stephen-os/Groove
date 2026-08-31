@@ -33,7 +33,8 @@
       [
         "expo-notifications",
         {
-          "color": "#ff8a3d"
+          "color": "#ff8a3d",
+          "icon": "./assets/images/android-icon-monochrome.png"
         }
       ],
       "./plugins/with-release-signing",
