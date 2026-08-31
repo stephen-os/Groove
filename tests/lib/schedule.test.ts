@@ -481,6 +481,24 @@ describe('paceLabel', () => {
     expect(pace(3, done(900, [SUN]), SUN)).toBe('1/3 this week · out of days');
   });
 
+  it('does not charge for the days before the habit existed', () => {
+    // Created on the Thursday of a week that began on Monday. Prorating across
+    // the whole week charged it for three days it did not exist, so a habit
+    // made minutes earlier opened reading "1 behind" - while Analytics, which
+    // was fixed for exactly this, scored the same habit 100%. The two screens
+    // contradicted each other about the same habit on the same day.
+    const gym = habit({ scheduleKind: 'weekly', targetCount: 2, id: 901, startsOn: THU });
+    const [entry] = habitsDueOn([gym], indexCompletions([]), THU).weekly;
+    expect(paceLabel(entry, THU)).toBe('0/2 this week · on track');
+  });
+
+  it('still calls a long-standing habit behind when it is', () => {
+    // Narrowing the proration must not stop it reporting a real shortfall.
+    const gym = habit({ scheduleKind: 'weekly', targetCount: 3, id: 902, startsOn: '2026-01-01' });
+    const [entry] = habitsDueOn([gym], indexCompletions([]), THU).weekly;
+    expect(paceLabel(entry, THU)).toBe('0/3 this week · 1 behind');
+  });
+
   it('measures against the target skipping left behind', () => {
     // Monday skipped, so two are owed, not three — and two of six days left is
     // comfortable rather than a warning.

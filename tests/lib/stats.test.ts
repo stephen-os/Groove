@@ -5,6 +5,7 @@ import type { Habit } from '@/lib/db/habits';
 import { indexCompletions } from '@/lib/schedule';
 import {
   currentStreak,
+  hadOpportunities,
   letterFor,
   longestStreak,
   needsImprovement,
@@ -58,7 +59,11 @@ const skip = (habitId: number, days: readonly string[]): Completion[] =>
 const daysOfSeptember = (count: number): string[] =>
   Array.from({ length: count }, (_, index) => `2026-09-${String(index + 1).padStart(2, '0')}`);
 
-const stats = (h: Habit, completions: readonly Completion[], today = '2026-09-30') =>
+// The day after the range, so every day in it is closed. Anchoring `today` on
+// the last day of the range instead made every test below quietly assert that
+// today counts toward the denominator too — which is a separate rule, is tested
+// on its own further down, and is not what any of these are about.
+const stats = (h: Habit, completions: readonly Completion[], today = '2026-10-01') =>
   statsFor(h, indexCompletions(completions), SEPTEMBER, today);
 
 describe('statsFor — denominator', () => {
@@ -89,7 +94,60 @@ describe('statsFor — denominator', () => {
 
   it('does not count days that have not happened yet', () => {
     const teeth = habit();
-    expect(stats(teeth, [], '2026-09-10').scheduled).toBe(10);
+    // Nine, not ten: the 1st to the 9th are closed and missed, and the 10th is
+    // today — still open, and not yet anything.
+    expect(stats(teeth, [], '2026-09-10').scheduled).toBe(9);
+  });
+
+  // Today is the day the app is actually looked at, so what it does with it is
+  // the number a person sees most often.
+  it('leaves today out until something is done about it', () => {
+    const teeth = habit();
+    // Counting today from midnight opened Analytics on 0% and grade F for a
+    // habit with a months-long streak, recovering only as the day was ticked.
+    expect(stats(teeth, [], '2026-09-10')).toMatchObject({ done: 0, scheduled: 9 });
+  });
+
+  it('counts today the moment it is ticked', () => {
+    const teeth = habit();
+    const result = stats(teeth, done(teeth.id, ['2026-09-10']), '2026-09-10');
+    expect(result).toMatchObject({ done: 1, scheduled: 10 });
+    expect(result.pct).toBe(10);
+  });
+
+  it('leaves today out of the denominator when it is skipped', () => {
+    const teeth = habit();
+    expect(stats(teeth, skip(teeth.id, ['2026-09-10']), '2026-09-10')).toMatchObject({
+      scheduled: 9,
+      skipped: 1,
+    });
+  });
+
+  it('treats a fresh day the same whatever the schedule kind', () => {
+    // The bug this replaces: the same "nothing done yet" state scored 0% for a
+    // daily habit and 100% for a flexible one, so the grade card depended on
+    // which kind happened to be in the list rather than on how anyone had done.
+    const week = { from: '2026-08-31', to: '2026-09-06' };
+    const monday = '2026-08-31';
+    const daily = habit({ startsOn: '2026-08-01' });
+    const flexible = habit({ scheduleKind: 'weekly', targetCount: 3, startsOn: '2026-08-01' });
+
+    const one = statsFor(daily, indexCompletions([]), week, monday);
+    const other = statsFor(flexible, indexCompletions([]), week, monday);
+    expect(one.pct).toBe(other.pct);
+    expect(one.belowTarget).toBe(false);
+    expect(overallGrade([one, other])).toEqual({ pct: 100, letter: 'A' });
+  });
+
+  it('is not counted as a perfect week when every day was skipped', () => {
+    // `scheduled` falls to zero because skipping opts the day out, and the
+    // "nothing to measure" fallback then reported 100% behind a full green bar
+    // over the caption "0 of 0" — a week the habit was never once done, shown
+    // as flawless. Something opted out of has no rate to report at all.
+    const teeth = habit();
+    const result = stats(teeth, skip(teeth.id, daysOfSeptember(30)));
+    expect(result).toMatchObject({ done: 0, scheduled: 0, skipped: 30 });
+    expect(hadOpportunities(result)).toBe(false);
   });
 
   it('scores a habit with no opportunities as 100, not 0', () => {
@@ -322,6 +380,36 @@ describe('longestStreak', () => {
   });
 });
 
+describe('currentStreak — a habit that has been archived', () => {
+  // Archived habits are loaded onto Analytics by `listHabitsWithArchived`, so
+  // these numbers are rendered rather than merely computed.
+  const RETIRED = new Date(2026, 8, 11).getTime(); // archived on 11 September
+
+  it('ends the streak on a missed final day', () => {
+    // Done the 7th, 8th and 9th, missed the 10th, archived on the 11th. The
+    // 10th was its last opportunity and it was missed, so there is no current
+    // streak. The "today is still open" step-back used to apply to the 10th as
+    // well, stepping over a real miss and reporting three.
+    const retired = habit({ startsOn: '2026-09-01', archivedAt: RETIRED });
+    const worked = done(retired.id, ['2026-09-07', '2026-09-08', '2026-09-09']);
+    expect(currentStreak(retired, indexCompletions(worked).get(retired.id), '2026-09-30')).toBe(0);
+  });
+
+  it('still counts a streak that ran to its last day', () => {
+    const retired = habit({ startsOn: '2026-09-01', archivedAt: RETIRED });
+    const worked = done(retired.id, ['2026-09-08', '2026-09-09', '2026-09-10']);
+    expect(currentStreak(retired, indexCompletions(worked).get(retired.id), '2026-09-30')).toBe(3);
+  });
+
+  it('still steps over today for a habit that is not archived', () => {
+    // The step-back is right for today, which has not finished. Narrowing it to
+    // archived habits must not take that with it.
+    const live = habit({ startsOn: '2026-09-01' });
+    const worked = done(live.id, ['2026-09-08', '2026-09-09']);
+    expect(currentStreak(live, indexCompletions(worked).get(live.id), '2026-09-10')).toBe(2);
+  });
+});
+
 describe('overallGrade', () => {
   const withPct = (pct: number, targetPct = 80): ReturnType<typeof statsFor> => {
     const h = habit({ targetPct });
@@ -329,7 +417,7 @@ describe('overallGrade', () => {
       h,
       indexCompletions(done(h.id, daysOfSeptember(Math.round((pct / 100) * 30)))),
       SEPTEMBER,
-      '2026-09-30'
+      '2026-10-01'
     );
   };
 

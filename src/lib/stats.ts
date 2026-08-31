@@ -82,6 +82,14 @@ function tally(
         skipped += 1;
         continue;
       }
+      // Today is still open. Counting it as a missed opportunity from midnight
+      // meant Analytics opened on 0% and grade F for a habit with a months-long
+      // streak, recovering only as the day was ticked off. The flexible branch
+      // below has never done this — `expectedByNow` floors a part-finished
+      // period to zero — so the same "nothing done yet" state scored 0% or 100%
+      // depending on nothing but the schedule kind. `currentStreak` steps over
+      // today for the same reason, three lines of this module apart.
+      if (day === today && status === undefined) continue;
       scheduled += 1;
       if (status === 'done') done += 1;
     }
@@ -140,7 +148,15 @@ export function currentStreak(
     let streak = 0;
     let cursor = end;
     // Today is still open, so skip past it rather than counting it as a miss.
-    if (maskIncludes(habit.weekdayMask, cursor) && days?.get(cursor) !== 'done') {
+    // Only today: for an archived habit `end` is the day before it was retired,
+    // a day that closed long ago. Stepping over that one skipped a real final
+    // miss — a habit done Mon to Wed, missed on Thursday and archived on Friday
+    // reported a three-day streak when its last opportunity was missed.
+    if (
+      end === today &&
+      maskIncludes(habit.weekdayMask, cursor) &&
+      days?.get(cursor) !== 'done'
+    ) {
       cursor = addDays(cursor, -1);
     }
     while (cursor >= habit.startsOn) {
@@ -231,9 +247,21 @@ export function statsFor(
   };
 }
 
-/** Whether a habit is worth showing in the range at all. */
+/**
+ * Whether a habit is worth showing in the range at all.
+ *
+ * Scheduled opportunities only. Admitting a habit on its skips alone put one
+ * that had been skipped every single day of the week into the list reading
+ * "100%" behind a full green bar, over the caption "0 of 0" — a week it was
+ * never once done, shown as flawless. Skipping is opting out, and something
+ * opted out of has no rate to report.
+ *
+ * It also keeps the list and the grade honest about each other: `overallGrade`
+ * already averages only habits with opportunities, so the card's "across N
+ * habits" now counts the same habits the number above it was computed from.
+ */
 export function hadOpportunities(stats: HabitStats): boolean {
-  return stats.scheduled > 0 || stats.skipped > 0;
+  return stats.scheduled > 0;
 }
 
 export interface Grade {

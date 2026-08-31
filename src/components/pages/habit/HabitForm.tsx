@@ -35,6 +35,9 @@ const KINDS: readonly { readonly kind: ScheduleKind; readonly label: string }[] 
 const MAX_PER_WEEK = 7;
 const MAX_PER_MONTH = 31;
 
+const maxFor = (kind: ScheduleKind): number =>
+  kind === 'weekly' ? MAX_PER_WEEK : MAX_PER_MONTH;
+
 const TARGETS: readonly number[] = [60, 70, 80, 90, 100];
 
 // What each follow-up count actually means, said in the words a person would
@@ -125,7 +128,7 @@ export function HabitForm({ initial, submitLabel, onSubmit, onArchive }: HabitFo
       weekdayMask: kind === 'daily' ? weekdayMask : EVERY_DAY,
       // A daily habit is scheduled by its mask, so a count would be a second
       // source of truth for the same thing. Store the schema's default.
-      targetCount: kind === 'daily' ? 1 : targetCount,
+      targetCount: kind === 'daily' ? 1 : Math.min(targetCount, maxFor(kind)),
       dueTime,
       remindEnabled: dueTime === null ? false : remindEnabled,
       followUps,
@@ -215,7 +218,16 @@ export function HabitForm({ initial, submitLabel, onSubmit, onArchive }: HabitFo
               key={option.kind}
               label={option.label}
               selected={kind === option.kind}
-              onPress={() => setKind(option.kind)}
+              onPress={() => {
+                setKind(option.kind);
+                // The count is shared between the two flexible kinds while the
+                // ceiling is not. Twenty a month is reasonable; twenty a week is
+                // unreachable, because one completion per day is a database
+                // constraint — and the habit would then sit at a permanent F
+                // with a permanently zero streak, top of "Needs improvement",
+                // for weeks completed perfectly.
+                setTargetCount((count) => Math.min(count, maxFor(option.kind)));
+              }}
               style={styles.grow}
             />
           ))}
@@ -254,7 +266,7 @@ export function HabitForm({ initial, submitLabel, onSubmit, onArchive }: HabitFo
           value={targetCount}
           onChange={setTargetCount}
           min={1}
-          max={kind === 'weekly' ? MAX_PER_WEEK : MAX_PER_MONTH}
+          max={maxFor(kind)}
           unit={kind === 'weekly' ? 'times a week' : 'times a month'}
         />
       )}

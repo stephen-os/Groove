@@ -346,7 +346,13 @@ export function paceLabel(entry: PeriodEntry, today: DayKey): string {
   if (remaining === entry.openDays) return `${progress} · every day left`;
 
   const period = periodOf(entry.habit, today);
-  const behind = expectedByNow(entry.target, period, today) - entry.count;
+  // From the habit's own start, not the period's. Without it a habit created on
+  // a Thursday is charged for the Monday, Tuesday and Wednesday before it
+  // existed: a fresh 2x-a-week habit read "1 behind" on the day it was made,
+  // while Analytics scored the same habit 100%. `tally` was fixed for this and
+  // this line was not, which is how the two screens came to disagree.
+  const behind =
+    expectedByNow(entry.target, period, today, entry.habit.startsOn) - entry.count;
   if (behind > 0) return `${progress} · ${behind} behind`;
   return `${progress} · on track`;
 }
