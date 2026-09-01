@@ -2,6 +2,19 @@
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "strict": true,
+    // Beyond `strict`. Each of these was measured against this codebase before
+    // being turned on, rather than adopted on principle:
+    //
+    // `noUncheckedIndexedAccess` types `arr[0]` as possibly undefined, which is
+    // where off-by-one and empty-array bugs live — and it is what makes the
+    // defensive guards in `data.ts` and `habit/[id].tsx` visible as necessary
+    // rather than looking like dead code to a linter.
+    "noUncheckedIndexedAccess": true,
+    // Passing an explicit `undefined` stops silently meaning "passed nothing".
+    "exactOptionalPropertyTypes": true,
+    // Both were already clean; they only stop future mistakes.
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
     // For tests/support/expo-sqlite.ts, which imports node:sqlite. Expo's base
     // sets `customConditions: ["react-native"]`, and @types/node has no such
     // condition to resolve through, so the built-ins are invisible without

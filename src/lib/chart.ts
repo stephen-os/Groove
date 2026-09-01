@@ -120,17 +120,36 @@ export function yFor(percent: number, box: PlotBox, domain: Domain = FULL): numb
  * towards straight segments, a smaller one makes it overshoot and invent
  * values that were never recorded.
  */
+/**
+ * The point at an index, clamped to the ends of the series.
+ *
+ * The curve's control points look one step either side of each segment, and at
+ * the ends there is no such neighbour — reusing the endpoint is what makes the
+ * first and last segments curve like every other one. That was two separate
+ * `?? points[index]` fallbacks; as one rule it is the same behaviour said once.
+ *
+ * The throw is unreachable: every caller checks the series is non-empty first.
+ * It is here so the clamp cannot quietly return undefined if that ever changes.
+ */
+function pointAt(points: readonly Point[], index: number): Point {
+  const point = points[Math.min(Math.max(index, 0), points.length - 1)];
+  if (point === undefined) throw new Error('No points to draw.');
+  return point;
+}
+
 export function smoothPath(points: readonly Point[]): string {
   if (points.length === 0) return '';
-  if (points.length === 1) return `M ${round(points[0].x)} ${round(points[0].y)}`;
 
-  let path = `M ${round(points[0].x)} ${round(points[0].y)}`;
+  const start = pointAt(points, 0);
+  if (points.length === 1) return `M ${round(start.x)} ${round(start.y)}`;
+
+  let path = `M ${round(start.x)} ${round(start.y)}`;
 
   for (let index = 0; index < points.length - 1; index += 1) {
-    const previous = points[index - 1] ?? points[index];
-    const current = points[index];
-    const next = points[index + 1];
-    const after = points[index + 2] ?? next;
+    const previous = pointAt(points, index - 1);
+    const current = pointAt(points, index);
+    const next = pointAt(points, index + 1);
+    const after = pointAt(points, index + 2);
 
     const c1 = {
       x: current.x + (next.x - previous.x) / 6,
@@ -156,8 +175,8 @@ export function smoothPath(points: readonly Point[]): string {
 export function areaPath(points: readonly Point[], baselineY: number): string {
   if (points.length === 0) return '';
   const line = smoothPath(points);
-  const last = points[points.length - 1];
-  const first = points[0];
+  const last = pointAt(points, points.length - 1);
+  const first = pointAt(points, 0);
   return `${line} L ${round(last.x)} ${round(baselineY)} L ${round(first.x)} ${round(baselineY)} Z`;
 }
 

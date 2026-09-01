@@ -24,12 +24,12 @@ const toRgb = (hex: string): [number, number, number] => {
 };
 
 const luminance = (hex: string): number => {
-  const [r, g, b] = toRgb(hex).map(channel);
+  const [r = NaN, g = NaN, b = NaN] = toRgb(hex).map(channel);
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 };
 
 const contrast = (a: string, b: string): number => {
-  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  const [hi = NaN, lo = NaN] = [luminance(a), luminance(b)].sort((x, y) => y - x);
   return (hi + 0.05) / (lo + 0.05);
 };
 

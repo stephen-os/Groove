@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { first } from '../support/fixtures';
 import { schemaFingerprint, SCHEMA } from '@/lib/db/schema';
 
 // The fingerprint is what decides whether the database on disk gets thrown away
@@ -31,7 +32,7 @@ describe('schemaFingerprint', () => {
   });
 
   it('changes when statements are reordered', () => {
-    const reordered = [SCHEMA[1], SCHEMA[0], ...SCHEMA.slice(2)];
+    const reordered = [first(SCHEMA.slice(1)), first(SCHEMA), ...SCHEMA.slice(2)];
     expect(schemaFingerprint(reordered)).not.toBe(schemaFingerprint());
   });
 

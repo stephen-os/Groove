@@ -29,6 +29,18 @@ export function todayKey(now: Date = new Date()): DayKey {
 }
 
 /**
+ * The three numbers in a day key.
+ *
+ * Defaulted to NaN rather than asserted. A malformed key produced an Invalid
+ * Date before and still does — the alternative is throwing from a parser that
+ * several screens call on every render.
+ */
+function parts(key: DayKey): [number, number, number] {
+  const [year = NaN, month = NaN, day = NaN] = key.split('-').map(Number);
+  return [year, month, day];
+}
+
+/**
  * A day key parsed back into a local `Date` at midnight.
  *
  * Built from components rather than `new Date(key)`, which the language spec
@@ -36,7 +48,7 @@ export function todayKey(now: Date = new Date()): DayKey {
  * previous day in every timezone behind UTC.
  */
 export function fromDayKey(key: DayKey): Date {
-  const [year, month, day] = key.split('-').map(Number);
+  const [year, month, day] = parts(key);
   return new Date(year, month - 1, day);
 }
 
@@ -55,8 +67,8 @@ export function addDays(key: DayKey, count: number): DayKey {
  * where the phone is, not 7am UTC.
  */
 export function atTimeOn(key: DayKey, time: string): Date {
-  const [year, month, day] = key.split('-').map(Number);
-  const [hours, minutes] = time.split(':').map(Number);
+  const [year, month, day] = parts(key);
+  const [hours = NaN, minutes = NaN] = time.split(':').map(Number);
   return new Date(year, month - 1, day, hours, minutes, 0, 0);
 }
 

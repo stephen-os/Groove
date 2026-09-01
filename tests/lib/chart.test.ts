@@ -26,29 +26,29 @@ describe('plot', () => {
 
   it('inverts y, because SVG counts down and a chart counts up', () => {
     const [zero, half, full] = plot([0, 50, 100], box);
-    expect(zero.y).toBe(100);
-    expect(half.y).toBe(50);
-    expect(full.y).toBe(0);
+    expect(zero?.y).toBe(100);
+    expect(half?.y).toBe(50);
+    expect(full?.y).toBe(0);
   });
 
   it('respects padding on every side', () => {
     const padded = plot([0, 100], { ...box, padLeft: 20, padRight: 10, padTop: 5, padBottom: 15 });
-    expect(padded[0].x).toBe(20);
-    expect(padded[1].x).toBe(290);
-    expect(padded[1].y).toBe(5);
-    expect(padded[0].y).toBe(85);
+    expect(padded[0]?.x).toBe(20);
+    expect(padded[1]?.x).toBe(290);
+    expect(padded[1]?.y).toBe(5);
+    expect(padded[0]?.y).toBe(85);
   });
 
   it('clamps values outside 0–100 rather than drawing outside the box', () => {
     const [low, high] = plot([-40, 180], box);
-    expect(low.y).toBe(100);
-    expect(high.y).toBe(0);
+    expect(low?.y).toBe(100);
+    expect(high?.y).toBe(0);
   });
 
   it('places a lone point at the left edge instead of dividing by zero', () => {
     const [only] = plot([50], box);
-    expect(Number.isFinite(only.x)).toBe(true);
-    expect(only.x).toBe(0);
+    expect(Number.isFinite(only?.x)).toBe(true);
+    expect(only?.x).toBe(0);
   });
 
   it('is empty for an empty series', () => {
@@ -59,7 +59,7 @@ describe('plot', () => {
 describe('yFor', () => {
   it('agrees with plot about where a percentage sits', () => {
     for (const percent of [0, 25, 50, 75, 100]) {
-      expect(yFor(percent, box)).toBe(plot([percent], box)[0].y);
+      expect(yFor(percent, box)).toBe(plot([percent], box)[0]?.y);
     }
   });
 });
@@ -76,10 +76,10 @@ describe('smoothPath', () => {
   it('starts at the first point and ends exactly on the last', () => {
     const points = plot([10, 90, 30, 70], box);
     const path = smoothPath(points);
-    expect(path.startsWith(`M ${points[0].x} ${points[0].y}`)).toBe(true);
+    expect(path.startsWith(`M ${points[0]?.x} ${points[0]?.y}`)).toBe(true);
     // The curve interpolates its points rather than approximating them, so the
     // final coordinate has to be the final measurement.
-    expect(path.trimEnd().endsWith(`${points[3].x} ${points[3].y}`)).toBe(true);
+    expect(path.trimEnd().endsWith(`${points[3]?.x} ${points[3]?.y}`)).toBe(true);
   });
 
   it('emits one curve segment per gap', () => {
@@ -193,12 +193,12 @@ describe('plot with a domain', () => {
   it('uses the whole height for the fitted range', () => {
     const domain = { min: 60, max: 100 };
     const [low, high] = plot([60, 100], tall, domain);
-    expect(low.y).toBe(100);
-    expect(high.y).toBe(0);
+    expect(low?.y).toBe(100);
+    expect(high?.y).toBe(0);
   });
 
   it('clamps to the domain rather than drawing outside the box', () => {
     const domain = { min: 60, max: 100 };
-    expect(plot([10], tall, domain)[0].y).toBe(100);
+    expect(plot([10], tall, domain)[0]?.y).toBe(100);
   });
 });

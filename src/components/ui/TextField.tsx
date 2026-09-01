@@ -6,7 +6,7 @@ import { borderAll, bevelSunken, colors, MIN_TOUCH_TARGET, radius, spacing } fro
 interface TextFieldProps extends Omit<TextInputProps, 'style'> {
   label: string;
   /** Shown under the field and announced as the field's error state. */
-  error?: string;
+  error?: string | undefined;
 }
 
 /**

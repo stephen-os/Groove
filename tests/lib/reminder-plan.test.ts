@@ -10,7 +10,7 @@ import { indexCompletions } from '@/lib/schedule';
 const MON = '2026-08-31';
 const TUE = '2026-09-01';
 const at = (day: string, hour: number, minute = 0): Date => {
-  const [y, m, d] = day.split('-').map(Number);
+  const [y = NaN, m = NaN, d = NaN] = day.split('-').map(Number);
   return new Date(y, m - 1, d, hour, minute);
 };
 
@@ -77,15 +77,15 @@ describe('planAlerts', () => {
     const alerts = plan([habit()], [], at(MON, 6), 1);
     expect(alerts).toHaveLength(4);
     expect(alerts.map((alert) => alert.sequence)).toEqual([0, 1, 2, 3]);
-    expect(alerts[0].fireAt).toBe(at(MON, 7).getTime());
-    expect(alerts[1].fireAt).toBe(at(MON, 7, 15).getTime());
-    expect(alerts[3].fireAt).toBe(at(MON, 8).getTime());
+    expect(alerts[0]?.fireAt).toBe(at(MON, 7).getTime());
+    expect(alerts[1]?.fireAt).toBe(at(MON, 7, 15).getTime());
+    expect(alerts[3]?.fireAt).toBe(at(MON, 8).getTime());
   });
 
   it('names the first alert plainly and the follow-ups as still outstanding', () => {
     const alerts = plan([habit({ name: 'Gym' })], [], at(MON, 6), 1);
-    expect(alerts[0].title).toBe('Gym');
-    expect(alerts[1].title).toBe('Still: Gym');
+    expect(alerts[0]?.title).toBe('Gym');
+    expect(alerts[1]?.title).toBe('Still: Gym');
   });
 
   it('drops alerts whose moment has already passed', () => {
@@ -153,8 +153,8 @@ describe('planAlerts', () => {
   it('carries the habit and day so a response knows what it refers to', () => {
     const teeth = habit();
     const [alert] = plan([teeth], [], at(MON, 6), 1);
-    expect(alert.habitId).toBe(teeth.id);
-    expect(alert.day).toBe(MON);
+    expect(alert?.habitId).toBe(teeth.id);
+    expect(alert?.day).toBe(MON);
   });
 
   it('ignores a habit that has not started yet', () => {
@@ -175,7 +175,7 @@ describe('planAlerts', () => {
   it('honours a habit that only wants one notification', () => {
     const alerts = plan([habit({ followUps: 0 })], [], at(MON, 6), 1);
     expect(alerts).toHaveLength(1);
-    expect(alerts[0].sequence).toBe(0);
+    expect(alerts[0]?.sequence).toBe(0);
   });
 
   it('honours a habit that wants a single follow-up', () => {

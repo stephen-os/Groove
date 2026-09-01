@@ -78,7 +78,8 @@ describe('deleteProfile', () => {
     expect(await counts()).toEqual({ profiles: 2, habits: 1, completions: 1 });
 
     const [, work] = await api.listProfileSummaries();
-    await api.deleteProfile(work.id);
+    expect(work).toBeDefined();
+    await api.deleteProfile(work!.id);
 
     // The orphans are the whole point. A surviving habit has no profile to
     // belong to, rides along in `exportData`'s unfiltered SELECT, and makes
@@ -90,7 +91,8 @@ describe('deleteProfile', () => {
     await seedProfile('Work');
     await seedProfile('Study');
     const summaries = await api.listProfileSummaries();
-    await api.deleteProfile(summaries[1].id);
+    expect(summaries).toHaveLength(3);
+    await api.deleteProfile(summaries[1]!.id);
 
     const left = await api.listProfileSummaries();
     expect(left.map((p) => p.name)).toEqual(['Personal', 'Study']);
@@ -149,7 +151,7 @@ describe('replaceData', () => {
 
     expect(await counts()).toEqual({ profiles: 1, habits: 1, completions: 1 });
     const [only] = await api.listProfileSummaries();
-    expect(only.name).toBe('Restored');
+    expect(only?.name).toBe('Restored');
     expect(await api.getActiveProfileId()).toBe(9);
   });
 });

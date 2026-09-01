@@ -29,7 +29,7 @@ interface HabitCheckRowProps {
   done: boolean;
   skipped: boolean;
   /** "1/3 this week · on track" for a flexible habit; absent for a daily one. */
-  pace?: string;
+  pace?: string | undefined;
   /** Future days cannot be changed. */
   disabled?: boolean;
   /**

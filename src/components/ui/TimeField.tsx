@@ -23,7 +23,7 @@ interface TimeFieldProps {
   /** 'HH:MM', or null for no particular time. */
   value: string | null;
   onChange: (value: string | null) => void;
-  error?: string;
+  error?: string | undefined;
 }
 
 /**

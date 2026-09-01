@@ -105,7 +105,8 @@ export async function deleteProfile(id: number): Promise<void> {
     'SELECT id FROM profiles WHERE id != ? ORDER BY id',
     [id]
   );
-  if (others.length === 0) {
+  const fallback = others[0];
+  if (fallback === undefined) {
     throw new Error('The last profile cannot be deleted.');
   }
 
@@ -130,7 +131,7 @@ export async function deleteProfile(id: number): Promise<void> {
       await txn.runAsync(
         `INSERT INTO settings (key, value) VALUES ('activeProfileId', ?)
          ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
-        [String(others[0].id)]
+        [String(fallback.id)]
       );
     }
   });

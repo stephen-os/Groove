@@ -12,11 +12,19 @@
  * thousand entries is not a choice, it is a search problem, and these cover
  * what a personal habit list actually contains.
  */
+/**
+ * The face a habit gets when it has never been given one.
+ *
+ * Named rather than read out of the list below. It has to be a member of that
+ * list or `isEmoji` mistakes it for an emoji and renders the name as text, which
+ * `tests/lib/theme.test.ts` asserts — but taking it *from* the list means asking
+ * for element zero of something the type system only knows is an array.
+ */
+export const DEFAULT_ICON = 'ellipse-outline';
+
 export const HABIT_ICONS: readonly string[] = [
-  // First, and the default: a habit that has never been given a face gets this
-  // one, so it has to be a member of this list or `isEmoji` will mistake it for
-  // an emoji and render the name as text.
-  'ellipse-outline',
+  // First, and the default: see DEFAULT_ICON above.
+  DEFAULT_ICON,
   'checkmark-circle-outline',
   'sunny-outline',
   'moon-outline',
@@ -57,8 +65,6 @@ export const HABIT_EMOJI: readonly string[] = [
   '🌙', '💰', '📞', '🌱', '🐕', '☕', '🚭', '🎨',
 ];
 
-export const DEFAULT_ICON = HABIT_ICONS[0];
-
 /** Whether this face is drawn as text rather than through Ionicons. */
 export function isEmoji(icon: string): boolean {
   return icon.length > 0 && !HABIT_ICONS.includes(icon);
@@ -71,12 +77,15 @@ export function isEmoji(icon: string): boolean {
  * body copy — these colour an icon and a progress bar, never a paragraph.
  * `tests/lib/theme.test.ts` asserts it.
  */
+/** The tint a habit falls back to. Its own orange, never the theme accent. */
+export const DEFAULT_COLOR = '#f08a45';
+
 export const HABIT_COLORS: readonly string[] = [
-  // Its own orange, not the theme accent. These used to start with
-  // `colors.accent`, which meant choosing a highlight colour in Settings
-  // silently repainted every habit that had taken the first swatch — a habit's
-  // tint is a property of the habit, and has to survive a change of theme.
-  '#f08a45',
+  // These used to start with `colors.accent`, which meant choosing a highlight
+  // colour in Settings silently repainted every habit that had taken the first
+  // swatch — a habit's tint is a property of the habit, and has to survive a
+  // change of theme.
+  DEFAULT_COLOR,
   '#f2c94c',
   '#5bd88a',
   '#4ecdc4',
@@ -107,5 +116,5 @@ export function habitIcon(icon: string): string {
  * invisible habit at worst.
  */
 export function habitColor(color: string): string {
-  return HABIT_COLORS.includes(color) ? color : HABIT_COLORS[0];
+  return HABIT_COLORS.includes(color) ? color : DEFAULT_COLOR;
 }

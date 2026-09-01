@@ -124,18 +124,18 @@ describe('planImport', () => {
   it('nests each habit under its profile', () => {
     const plan = planImport(data());
     expect(plan.map((p) => p.name)).toEqual(['Personal', 'Work']);
-    expect(plan[0].habits).toHaveLength(2);
-    expect(plan[1].habits).toHaveLength(1);
+    expect(plan[0]?.habits).toHaveLength(2);
+    expect(plan[1]?.habits).toHaveLength(1);
   });
 
   it('nests each completion under its habit', () => {
     const plan = planImport(data());
-    expect(plan[0].habits[0].completions.map((c) => c.day)).toEqual([
+    expect(plan[0]?.habits[0]?.completions.map((c) => c.day)).toEqual([
       '2026-08-01',
       '2026-08-02',
     ]);
-    expect(plan[0].habits[1].completions).toEqual([]);
-    expect(plan[1].habits[0].completions.map((c) => c.day)).toEqual(['2026-08-01']);
+    expect(plan[0]?.habits[1]?.completions).toEqual([]);
+    expect(plan[1]?.habits[0]?.completions.map((c) => c.day)).toEqual(['2026-08-01']);
   });
 
   // The reason the plan is nested at all: an id in a file belongs to the phone
@@ -163,7 +163,7 @@ describe('planImport', () => {
       habits: [habit(10, 1, { name: 'Gym', dueTime: '18:00', targetPct: 90 })],
       completions: [],
     };
-    expect(planImport(source)[0].habits[0]).toEqual({
+    expect(planImport(source)[0]?.habits[0]).toEqual({
       name: 'Gym',
       icon: 'ellipse-outline',
       color: '#f08a45',
@@ -185,8 +185,8 @@ describe('planImport', () => {
   it('handles a habits-only file', () => {
     const plan = planImport(stripHistory(scopeToProfile(data(), 1), TODAY));
     expect(plan).toHaveLength(1);
-    expect(plan[0].habits).toHaveLength(2);
-    expect(plan[0].habits.every((h) => h.completions.length === 0)).toBe(true);
+    expect(plan[0]?.habits).toHaveLength(2);
+    expect(plan[0]?.habits.every((h) => h.completions.length === 0)).toBe(true);
   });
 
   it('ignores a completion whose habit is not in the file', () => {
@@ -198,7 +198,7 @@ describe('planImport', () => {
       habits: [habit(10, 1)],
       completions: [completion(100, 10, '2026-08-01'), completion(101, 999, '2026-08-01')],
     };
-    expect(planImport(source)[0].habits[0].completions).toHaveLength(1);
+    expect(planImport(source)[0]?.habits[0]?.completions).toHaveLength(1);
   });
 
   it('produces an empty profile rather than dropping it', () => {
@@ -270,7 +270,7 @@ describe('clashingProfiles', () => {
 
 describe('planImport renaming', () => {
   it('uses the name from the file when nothing is chosen', () => {
-    expect(planImport(data())[0].name).toBe('Personal');
+    expect(planImport(data())[0]?.name).toBe('Personal');
   });
 
   it('applies a chosen name, keyed by the id in the file', () => {
@@ -280,8 +280,8 @@ describe('planImport renaming', () => {
 
   it('renames without disturbing what is underneath', () => {
     const plan = planImport(data(), new Map([[1, 'Phone']]));
-    expect(plan[0].habits).toHaveLength(2);
-    expect(plan[0].habits[0].completions).toHaveLength(2);
+    expect(plan[0]?.habits).toHaveLength(2);
+    expect(plan[0]?.habits[0]?.completions).toHaveLength(2);
   });
 
   it('ignores an id the file does not contain', () => {

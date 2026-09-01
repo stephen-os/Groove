@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { first } from '../support/fixtures';
 import { EVERY_DAY } from '@/lib/date';
 import type { Completion } from '@/lib/db/completions';
 import type { Habit, ScheduleKind } from '@/lib/db/habits';
@@ -160,8 +161,8 @@ describe('habitsDueOn — skipping', () => {
   it('reports a skipped habit as skipped, not done', () => {
     const teeth = habit();
     const [entry] = habitsDueOn([teeth], indexCompletions(skip(teeth.id, [MON])), MON).daily;
-    expect(entry.skipped).toBe(true);
-    expect(entry.done).toBe(false);
+    expect(entry?.skipped).toBe(true);
+    expect(entry?.done).toBe(false);
   });
 
   it('keeps a skipped habit visible so the skip can be undone', () => {
@@ -174,8 +175,8 @@ describe('habitsDueOn — skipping', () => {
     const index = indexCompletions([...done(gym.id, [MON]), ...skip(gym.id, [TUE])]);
     const [entry] = habitsDueOn([gym], index, THU).weekly;
     // Three a week, one opted out of, so two are needed and one is done.
-    expect(entry.target).toBe(2);
-    expect(entry.count).toBe(1);
+    expect(entry?.target).toBe(2);
+    expect(entry?.count).toBe(1);
   });
 
   it('lets skips alone satisfy a flexible habit', () => {
@@ -235,8 +236,8 @@ describe('habitsDueOn — daily', () => {
   it('reports whether it is already ticked', () => {
     const teeth = habit();
     const index = indexCompletions(done(teeth.id, [MON]));
-    expect(habitsDueOn([teeth], index, MON).daily[0].done).toBe(true);
-    expect(habitsDueOn([teeth], index, TUE).daily[0].done).toBe(false);
+    expect(habitsDueOn([teeth], index, MON).daily[0]?.done).toBe(true);
+    expect(habitsDueOn([teeth], index, TUE).daily[0]?.done).toBe(false);
   });
 
   it('stays visible once ticked, so the tick can be taken back', () => {
@@ -265,9 +266,9 @@ describe('habitsDueOn — weekly', () => {
 
   it('reports progress through the week', () => {
     const [entry] = call(3, [MON, TUE], THU);
-    expect(entry.count).toBe(2);
-    expect(entry.target).toBe(3);
-    expect(entry.done).toBe(false);
+    expect(entry?.count).toBe(2);
+    expect(entry?.target).toBe(3);
+    expect(entry?.done).toBe(false);
   });
 
   it('steps aside for the rest of the week once the target is met', () => {
@@ -277,8 +278,8 @@ describe('habitsDueOn — weekly', () => {
   it('stays visible on the day the target was met, so it can be undone', () => {
     const entries = call(3, [MON, TUE, THU], THU);
     expect(entries).toHaveLength(1);
-    expect(entries[0].done).toBe(true);
-    expect(entries[0].count).toBe(3);
+    expect(entries[0]?.done).toBe(true);
+    expect(entries[0]?.count).toBe(3);
   });
 
   it('comes back in the following week', () => {
@@ -288,7 +289,7 @@ describe('habitsDueOn — weekly', () => {
 
   it('does not count completions from the previous week', () => {
     const [entry] = call(3, ['2026-08-27', '2026-08-28'], MON);
-    expect(entry.count).toBe(0);
+    expect(entry?.count).toBe(0);
   });
 });
 
@@ -301,8 +302,8 @@ describe('habitsDueOn — monthly', () => {
   it('counts across the whole calendar month, not the week', () => {
     // Three weeks apart, so a week-scoped count would report 0 or 1 here.
     const [entry] = call(3, ['2026-09-01', '2026-09-20'], '2026-09-25');
-    expect(entry.count).toBe(2);
-    expect(entry.target).toBe(3);
+    expect(entry?.count).toBe(2);
+    expect(entry?.target).toBe(3);
   });
 
   it('steps aside once met', () => {
@@ -389,7 +390,7 @@ describe('groupByDueTime', () => {
       row('Brush teeth', '07:00'),
       row('Make bed', '07:00'),
     ]);
-    expect(groups[0].data.map((entry) => entry.habit.name)).toEqual([
+    expect(groups[0]?.data.map((entry) => entry.habit.name)).toEqual([
       'Brush teeth',
       'Make bed',
       'Vitamins',
@@ -404,7 +405,7 @@ describe('groupByDueTime', () => {
   it('gathers every untimed habit into one group, sorted by name', () => {
     const groups = groupByDueTime([row('Read', null), row('Gym', null), row('Teeth', '07:00')]);
     expect(groups).toHaveLength(2);
-    expect(groups[1].data.map((entry) => entry.habit.name)).toEqual(['Gym', 'Read']);
+    expect(groups[1]?.data.map((entry) => entry.habit.name)).toEqual(['Gym', 'Read']);
   });
 
   it('sorts times numerically rather than by hour digit', () => {
@@ -434,7 +435,7 @@ describe('paceLabel', () => {
       indexCompletions(completions.map((entry) => ({ ...entry, habitId: gym.id }))),
       day
     );
-    const [entry] = kind === 'weekly' ? rows.weekly : rows.monthly;
+    const entry = first(kind === 'weekly' ? rows.weekly : rows.monthly);
     return paceLabel(entry, day);
   };
 
@@ -488,14 +489,14 @@ describe('paceLabel', () => {
     // was fixed for exactly this, scored the same habit 100%. The two screens
     // contradicted each other about the same habit on the same day.
     const gym = habit({ scheduleKind: 'weekly', targetCount: 2, id: 901, startsOn: THU });
-    const [entry] = habitsDueOn([gym], indexCompletions([]), THU).weekly;
+    const entry = first(habitsDueOn([gym], indexCompletions([]), THU).weekly);
     expect(paceLabel(entry, THU)).toBe('0/2 this week · on track');
   });
 
   it('still calls a long-standing habit behind when it is', () => {
     // Narrowing the proration must not stop it reporting a real shortfall.
     const gym = habit({ scheduleKind: 'weekly', targetCount: 3, id: 902, startsOn: '2026-01-01' });
-    const [entry] = habitsDueOn([gym], indexCompletions([]), THU).weekly;
+    const entry = first(habitsDueOn([gym], indexCompletions([]), THU).weekly);
     expect(paceLabel(entry, THU)).toBe('0/3 this week · 1 behind');
   });
 

@@ -69,7 +69,9 @@ const dayKey = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected a YYYY-MM-DD day.')
   .refine((value) => {
-    const [year, month, day] = value.split('-').map(Number);
+    // NaN defaults rather than assertions: this is the validator, so a string
+    // that does not split into three numbers has to *fail*, not throw.
+    const [year = NaN, month = NaN, day = NaN] = value.split('-').map(Number);
     if (year < 2000 || year > 2200) return false;
     const date = new Date(year, month - 1, day);
     // Round-trips only if the components describe a day that exists: JavaScript

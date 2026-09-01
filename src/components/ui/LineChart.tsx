@@ -59,7 +59,7 @@ export function LineChart({ values, labels, tint, accessibilityLabel }: LineChar
   const ticks = ticksFor(domain);
   const points = plot(values, box, domain);
   const baseline = yFor(domain.min, box, domain);
-  const last = points[points.length - 1];
+  const last = points.at(-1);
   const labelAt = labelIndices(labels.length, 4);
 
   if (points.length === 0) {
@@ -106,8 +106,12 @@ export function LineChart({ values, labels, tint, accessibilityLabel }: LineChar
         />
 
         {/* The latest reading is the one the eye should land on. */}
-        <Circle cx={last.x} cy={last.y} r={4.5} fill={tint} />
-        <Circle cx={last.x} cy={last.y} r={8} fill={tint} fillOpacity={0.22} />
+        {last && (
+          <>
+            <Circle cx={last.x} cy={last.y} r={4.5} fill={tint} />
+            <Circle cx={last.x} cy={last.y} r={8} fill={tint} fillOpacity={0.22} />
+          </>
+        )}
       </Svg>
 
       {/* Axis labels are React Native text, not SVG text: they inherit the

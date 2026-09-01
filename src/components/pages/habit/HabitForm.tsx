@@ -10,7 +10,13 @@ import { Stepper } from '@/components/ui/Stepper';
 import { Bubble } from '@/components/ui/Bubble';
 import { EVERY_DAY, WEEKDAYS } from '@/lib/date';
 import { HabitFace } from '@/components/pages/habit/HabitFace';
-import { DEFAULT_ICON, HABIT_COLORS, HABIT_EMOJI, HABIT_ICONS } from '@/lib/habit-style';
+import {
+  DEFAULT_COLOR,
+  DEFAULT_ICON,
+  HABIT_COLORS,
+  HABIT_EMOJI,
+  HABIT_ICONS,
+} from '@/lib/habit-style';
 import type { HabitInput, ScheduleKind } from '@/lib/db/habits';
 import { GUTTER, MIN_TOUCH_TARGET, bevelRound, colors, depth, radius, spacing } from '@/lib/theme';
 
@@ -52,7 +58,7 @@ const NAGS: readonly { readonly count: number; readonly label: string }[] = [
 export const EMPTY_HABIT: HabitInput = {
   name: '',
   icon: DEFAULT_ICON,
-  color: HABIT_COLORS[0],
+  color: DEFAULT_COLOR,
   scheduleKind: 'daily',
   weekdayMask: EVERY_DAY,
   targetCount: 3,

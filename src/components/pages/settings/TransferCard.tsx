@@ -136,12 +136,16 @@ export function TransferCard({ onFinished }: { onFinished: (message: string) => 
   };
 
   if (pending !== null) {
+    // One clash is the ordinary case — a single-profile file landing on a phone
+    // that already uses its name — and it gets the sentence that says so.
+    const only = pending.clashes.length === 1 ? pending.clashes[0] : undefined;
+
     return (
       <Card>
         <Text variant="heading">Name the imported profile</Text>
         <Text tone="muted">
-          {pending.clashes.length === 1
-            ? `This phone already has a profile called "${pending.clashes[0].name}". Two profiles cannot share a name, so give this one a different one.`
+          {only
+            ? `This phone already has a profile called "${only.name}". Two profiles cannot share a name, so give this one a different one.`
             : `This phone already uses ${pending.clashes.length} of the names in that file. Two profiles cannot share a name, so give each of these a different one.`}
         </Text>
 

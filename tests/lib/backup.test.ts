@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { first } from '../support/fixtures';
 import {
   backupFilename,
   BACKUP_FORMAT_VERSION,
@@ -111,31 +112,31 @@ describe('parseBackup', () => {
 
   it('rejects a day that is not YYYY-MM-DD', () => {
     const backup = validBackup();
-    (backup.completions as { day: string }[])[0].day = '30/08/2026';
+    first(backup.completions as { day: string }[]).day = '30/08/2026';
     expectRejected(backup, 'not a valid backup');
   });
 
   it('rejects a weekday mask outside one week', () => {
     const backup = validBackup();
-    (backup.habits as { weekdayMask: number }[])[0].weekdayMask = 255;
+    first(backup.habits as { weekdayMask: number }[]).weekdayMask = 255;
     expectRejected(backup, 'not a valid backup');
   });
 
   it('rejects a schedule kind the app does not have', () => {
     const backup = validBackup();
-    (backup.habits as { scheduleKind: string }[])[0].scheduleKind = 'fortnightly';
+    first(backup.habits as { scheduleKind: string }[]).scheduleKind = 'fortnightly';
     expectRejected(backup, 'not a valid backup');
   });
 
   it('rejects a malformed due time', () => {
     const backup = validBackup();
-    (backup.habits as { dueTime: string | null }[])[0].dueTime = '25:00';
+    first(backup.habits as { dueTime: string | null }[]).dueTime = '25:00';
     expectRejected(backup, 'not a valid backup');
   });
 
   it('accepts a habit with no due time', () => {
     const backup = validBackup();
-    (backup.habits as { dueTime: string | null }[])[0].dueTime = null;
+    first(backup.habits as { dueTime: string | null }[]).dueTime = null;
     expect(parseBackup(JSON.stringify(backup)).ok).toBe(true);
   });
 });
@@ -146,13 +147,13 @@ describe('parseBackup', () => {
 describe('parseBackup referential integrity', () => {
   it('rejects a habit belonging to a profile the file does not contain', () => {
     const backup = validBackup();
-    (backup.habits as { profileId: number }[])[0].profileId = 7;
+    first(backup.habits as { profileId: number }[]).profileId = 7;
     expectRejected(backup, 'profile it does not contain');
   });
 
   it('rejects a completion for a habit the file does not contain', () => {
     const backup = validBackup();
-    (backup.completions as { habitId: number }[])[0].habitId = 99;
+    first(backup.completions as { habitId: number }[]).habitId = 99;
     expectRejected(backup, 'habit it does not contain');
   });
 
@@ -169,7 +170,7 @@ describe('parseBackup referential integrity', () => {
   it('rejects duplicate profile ids', () => {
     const backup = validBackup();
     const profiles = backup.profiles as { id: number; name: string; createdAt: number }[];
-    profiles.push({ ...profiles[0] });
+    profiles.push({ ...first(profiles) });
     expectRejected(backup, 'duplicate profiles');
   });
 
@@ -180,7 +181,7 @@ describe('parseBackup referential integrity', () => {
     // refusing it up front.
     const backup = validBackup();
     const profiles = backup.profiles as { id: number; name: string; createdAt: number }[];
-    profiles.push({ ...profiles[0], id: profiles[0].id + 1 });
+    profiles.push({ ...first(profiles), id: first(profiles).id + 1 });
     expectRejected(backup, 'same name');
   });
 
@@ -188,9 +189,9 @@ describe('parseBackup referential integrity', () => {
     const backup = validBackup();
     const profiles = backup.profiles as { id: number; name: string; createdAt: number }[];
     profiles.push({
-      ...profiles[0],
-      id: profiles[0].id + 1,
-      name: profiles[0].name.toUpperCase(),
+      ...first(profiles),
+      id: first(profiles).id + 1,
+      name: first(profiles).name.toUpperCase(),
     });
     expectRejected(backup, 'same name');
   });
@@ -201,7 +202,7 @@ describe('parseBackup referential integrity', () => {
     // once part of the file has already been written.
     const backup = validBackup();
     const completions = backup.completions as { id: number; day: string }[];
-    completions.push({ ...completions[0], day: '2026-09-02' });
+    completions.push({ ...first(completions), day: '2026-09-02' });
     expectRejected(backup, 'duplicate completions');
   });
 
@@ -210,20 +211,20 @@ describe('parseBackup referential integrity', () => {
     // since names are unique it would leave a profile nothing can tell apart,
     // in the one screen whose whole job is telling them apart.
     const backup = validBackup();
-    (backup.profiles as { name: string }[])[0].name = '';
+    first(backup.profiles as { name: string }[]).name = '';
     expectRejected(backup, 'not a valid backup');
   });
 
   it('rejects a habit with no name', () => {
     const backup = validBackup();
-    (backup.habits as { name: string }[])[0].name = '';
+    first(backup.habits as { name: string }[]).name = '';
     expectRejected(backup, 'not a valid backup');
   });
 
   it('rejects duplicate habit ids', () => {
     const backup = validBackup();
     const habits = backup.habits as { id: number }[];
-    habits.push({ ...habits[0] });
+    habits.push({ ...first(habits) });
     expectRejected(backup, 'duplicate habits');
   });
 
@@ -306,7 +307,7 @@ describe('tooLarge', () => {
 describe('parseBackup day validation', () => {
   const withStart = (startsOn: string): Record<string, unknown> => {
     const backup = validBackup();
-    (backup.habits as { startsOn: string }[])[0].startsOn = startsOn;
+    first(backup.habits as { startsOn: string }[]).startsOn = startsOn;
     return backup;
   };
 
@@ -325,7 +326,7 @@ describe('parseBackup day validation', () => {
 
   it('refuses a habit scheduled on no days at all', () => {
     const backup = validBackup();
-    (backup.habits as { weekdayMask: number }[])[0].weekdayMask = 0;
+    first(backup.habits as { weekdayMask: number }[]).weekdayMask = 0;
     expectRejected(backup, 'not a valid backup');
   });
 });
