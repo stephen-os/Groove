@@ -5,7 +5,7 @@ reminders that stop nagging once you've ticked the box, and an honest read on ho
 doing.
 
 **Expo SDK 57** · **React Native 0.86** · **React 19** · **TypeScript** ·
-**expo-router** · **expo-sqlite** · **Vitest** · Android
+**expo-router** · **expo-sqlite** · **Vitest + Jest** · Android
 
 Everything is on the device. No server, no account, no network — which also means a lost
 phone loses the data, so the export exists.
@@ -13,6 +13,7 @@ phone loses the data, so the export exists.
 <p align="center">
   <img src="docs/screenshots/today.png" width="240" alt="Today — habits grouped by the time they are due">
   <img src="docs/screenshots/analytics.png" width="240" alt="Analytics — grade, ninety-day trend and per-habit rates">
+  <img src="docs/screenshots/analytics-habits.png" width="240" alt="Analytics, per habit — rate, streak and best run against each target">
   <img src="docs/screenshots/history.png" width="240" alt="History — a month at a glance, any past day editable">
 </p>
 
@@ -103,13 +104,14 @@ See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for the build-and-run loop, and
 [docs/RELEASE.md](docs/RELEASE.md) for signing and shipping an APK.
 
 ```
-npm run verify      # test -> typecheck -> lint -> deadcode -> secrets
+npm run verify      # both test suites -> typecheck -> lint -> deadcode -> secrets
 npm run doctor      # expo-doctor
 npm run android     # the only thing that proves it actually builds
 ```
 
 `npm run verify` never compiles the Android app. Green means the JavaScript is sound and
-the config is valid; it does not mean the app builds or runs.
+the config is valid; it does not mean the app builds or runs. CI assembles a debug build
+on every push for exactly that reason.
 
 ## Repository
 
