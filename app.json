@@ -38,7 +38,8 @@
         }
       ],
       "./plugins/with-release-signing",
-      "expo-font"
+      "expo-font",
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true

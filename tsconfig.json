@@ -20,7 +20,10 @@
     // condition to resolve through, so the built-ins are invisible without
     // naming it here. Safe because nothing in src/ touches a global that Node
     // and React Native type differently — no setTimeout, no process, no Buffer.
-    "types": ["node"],
+    // `node` for tests/support/expo-sqlite.ts, `jest` for the component suite.
+    // The Vitest files import describe/it/expect from 'vitest' explicitly, so
+    // the Jest globals never shadow them.
+    "types": ["node", "jest"],
     "paths": {
       "@/*": [
         "./src/*"

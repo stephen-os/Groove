@@ -54,6 +54,24 @@ export class Directory {
   }
 }
 
+/**
+ * The file the next `pickFileAsync` returns, or null for a cancelled pick.
+ *
+ * The picker is a system activity, so there is nothing to drive — the test says
+ * what the user would have chosen and the app reads it exactly as it would a
+ * real one, off the real filesystem.
+ */
+let picked: string | null = null;
+
+export const picker = {
+  choose: (uri: string): void => {
+    picked = uri;
+  },
+  cancel: (): void => {
+    picked = null;
+  },
+};
+
 export class File {
   readonly uri: string;
 
@@ -87,6 +105,24 @@ export class File {
 
   delete(): void {
     rmSync(this.uri, { force: true });
+  }
+
+  readableStream(): ReadableStream<Uint8Array> {
+    const bytes = readFileSync(this.uri);
+    return new ReadableStream<Uint8Array>({
+      start(controller) {
+        // One chunk is enough: the app only counts bytes and stops early.
+        controller.enqueue(new Uint8Array(bytes));
+        controller.close();
+      },
+    });
+  }
+
+  static async pickFileAsync(_options?: {
+    mimeTypes?: string;
+  }): Promise<{ canceled: true } | { canceled: false; result: File }> {
+    if (picked === null) return { canceled: true };
+    return { canceled: false, result: new File(picked) };
   }
 }
 

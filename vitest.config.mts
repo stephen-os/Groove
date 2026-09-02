@@ -15,6 +15,20 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['tests/**/*.test.ts'],
+
+    // A map, deliberately not a gate. There is no threshold here because a
+    // threshold is a number people make go up, and the cheapest way to do that
+    // is a test that executes a line without asserting anything about it. What
+    // this is for is the other question — which parts of the app no test has
+    // ever run — and the answer to that used to be the whole of src/lib/db and
+    // reminders.ts, which is precisely where the worst bugs were living.
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'html'],
+      include: ['src/lib/**'],
+      // Components need a renderer; they are covered by the jest-expo suite.
+      exclude: ['src/lib/notifications.ts'],
+    },
   },
   resolve: {
     alias: {
@@ -23,6 +37,7 @@ export default defineConfig({
       'expo-file-system': path.resolve('tests/support/expo-file-system.ts'),
       'expo-notifications': path.resolve('tests/support/expo-notifications.ts'),
       'react-native': path.resolve('tests/support/react-native.ts'),
+      'expo-sharing': path.resolve('tests/support/expo-sharing.ts'),
     },
   },
 });

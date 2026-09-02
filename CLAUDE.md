@@ -152,6 +152,38 @@ just read. Several of these look correct and fail at runtime.
 Anything that deletes rows, or relies on a constraint, belongs in a test here rather
 than in a hope.
 
+### Testing components
+
+A second runner, because a React Native renderer is something Vitest cannot give.
+They are split by extension so neither picks up the other's tests:
+
+| | runner | what |
+| --- | --- | --- |
+| `tests/**/*.test.ts` | Vitest | pure logic, and the data layer against real SQLite |
+| `tests/components/**/*.test.tsx` | Jest + `jest-expo` | what a component renders and announces |
+
+The split is by capability, not taste: everything that *can* run under Vitest does,
+because it starts and finishes an order of magnitude faster.
+
+**React Native Testing Library 14 is asynchronous.** Both `render` and every
+`fireEvent` return a promise, and both must be awaited:
+
+- A missing `await render(...)` makes every query throw "`render` function has not
+  been called", which reads like a broken setup rather than a missing await.
+- A missing `await fireEvent(...)` leaves an `act()` scope open. The current test
+  still passes; every *later* render in the file returns an empty tree, so the
+  failure lands nowhere near its cause.
+
+`@/lib/db/settings` is mocked in `tests/components/setup.ts` so a render never depends
+on a native module. Use `setupFilesAfterEnv`, never `setupFiles` — the latter runs
+before the test framework exists, so an `afterEach` registered there never runs. Do not
+set `clearMocks`; it wipes the implementations that setup file installs.
+
+Making a container `accessible` — as `Stepper` does, so its adjustable role reaches
+TalkBack at all — hides its children from accessibility queries. That is correct on a
+device and means a test wanting the inner text has to ask for
+`{ includeHiddenElements: true }`.
+
 ### Security
 
 - There are no secrets, and there should be none. Anything bundled into the app is
@@ -209,9 +241,16 @@ The web rules don't translate directly; these are the mobile equivalents.
 ## Verify
 
 ```
-npm run verify      # test -> typecheck -> lint -> deadcode -> secrets
-npm run doctor      # expo-doctor
+npm run verify          # both test suites -> typecheck -> lint -> deadcode -> secrets
+npm run test:coverage   # a map of what no test has run, not a gate
+npm run doctor          # expo-doctor
 ```
+
+Coverage has no threshold on purpose. A threshold is a number people make go up, and
+the cheapest way to do that is a test that executes a line without asserting anything
+about it. The question worth asking it is the other one — which parts nothing has ever
+run — and the answer to that was once the whole of `src/lib/db`, `reminders.ts` and
+`backup-file.ts`, which is exactly where the worst bugs were.
 
 `npm run deadcode` and `npm run secrets` are named that way because scripts called
 `knip` and `secretlint` shadow the binaries in `node_modules/.bin`, which `expo-doctor`
@@ -219,4 +258,5 @@ flags.
 
 **What the verify loop cannot tell you:** it never compiles the Android app. A green
 `verify` plus a green `doctor` means the JavaScript is sound and the config is valid —
-it does not mean the app builds or runs. Only `npm run android` proves that.
+it does not mean the app builds or runs. Only `npm run android` proves that locally;
+CI's `android` job assembles a debug build for the same reason.

@@ -267,6 +267,24 @@ describe('backupFilename', () => {
 
 // The per-field bounds only bite once the file is a string in memory. This is
 // the same ceiling in a form that can be checked before a byte is read.
+describe('telling a wrong file from a wrong version', () => {
+  it('does not blame the version when the file has none', () => {
+    // A shopping list is not a backup from an older build. Saying so sends
+    // someone hunting for a version of an app that never wrote the file.
+    const result = parseBackup(JSON.stringify({ milk: true }));
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error).toContain('not a valid backup');
+  });
+
+  it('does blame the version when the file carries a different one', () => {
+    const result = parseBackup(JSON.stringify({ formatVersion: 99, profiles: [] }));
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error).toContain('different app version');
+  });
+});
+
 describe('tooLarge', () => {
   it('accepts a file at the limit', () => {
     expect(tooLarge(MAX_BACKUP_BYTES)).toBe(false);

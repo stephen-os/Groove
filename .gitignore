@@ -46,3 +46,4 @@ example
 # losing control of it means losing control of app updates.
 *.keystore
 keystore.properties
+coverage/

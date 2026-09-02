@@ -237,9 +237,19 @@ export function parseBackup(text: string): ParseResult {
   if (!parsed.success) {
     // Distinguish the one failure a user can act on: a file from a version this
     // build doesn't understand. Everything else is "wrong file".
-    const wrongVersion = parsed.error.issues.some(
-      (issue) => issue.path.length === 1 && issue.path[0] === 'formatVersion'
-    );
+    //
+    // It has to *carry* a version to be one of ours at all. Without that check
+    // a missing `formatVersion` looked exactly like a wrong one, so picking any
+    // stray JSON — a shopping list, a config file — was answered with "that
+    // backup was written by a different app version", which sends someone
+    // hunting for an older build of an app that never wrote the file.
+    const carriesVersion =
+      typeof json === 'object' && json !== null && 'formatVersion' in json;
+    const wrongVersion =
+      carriesVersion &&
+      parsed.error.issues.some(
+        (issue) => issue.path.length === 1 && issue.path[0] === 'formatVersion'
+      );
     return {
       ok: false,
       error: wrongVersion

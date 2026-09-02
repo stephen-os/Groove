@@ -63,6 +63,13 @@ export function Stepper({ label, value, onChange, min, max, unit }: StepperProps
         // The adjustable role is what makes this swipeable under TalkBack, which
         // is how a screen-reader user changes a number without hunting for two
         // small arrows.
+        //
+        // `accessible` is what makes that true rather than merely intended: a
+        // View is not an accessibility element unless it says so, so the role
+        // and the actions below were being announced to nobody. It also gathers
+        // the arrows into this one element, which is the point — the whole
+        // control is the thing you adjust, not two separate small targets.
+        accessible
         accessibilityRole="adjustable"
         accessibilityLabelledBy={labelId}
         accessibilityValue={{ min, max, now: value, text: unit ? `${value} ${unit}` : undefined }}
