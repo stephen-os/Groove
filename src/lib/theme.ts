@@ -393,9 +393,23 @@ export const spacing = {
  * gradient of light across it and the extruded illusion collapses.
  */
 export const radius = {
-  sm: 12,
-  md: 18,
-  lg: 26,
+  /**
+   * One corner, everywhere: 8.
+   *
+   * These were 26 / 18 / 12 -- a soft bubble -- and briefly 8 / 6 / 4, which
+   * kept a layered scale where each step sat inside a larger one. Flat at 8
+   * reads more deliberate: nothing is subtly rounder than the thing next to it,
+   * so the shape stops being something the eye has to account for.
+   *
+   * The three names are kept even though they now hold the same number. They
+   * mark what each call site *is* -- container, button, small control -- so a
+   * layer can be given its own corner again by editing one line here rather
+   * than hunting through fifteen files. `full` is unrelated: it means a real
+   * circle, and habit icons and accent swatches still are.
+   */
+  sm: 8,
+  md: 8,
+  lg: 8,
   /** Circles: icon bubbles and pills. */
   full: 999,
 } as const;
