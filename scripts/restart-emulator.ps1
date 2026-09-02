@@ -77,8 +77,13 @@ if (-not $Keep) {
   # security setting for a whole day -- allowBackup stayed true on the device
   # while app.json had said false since morning. Re-syncing every run is the
   # only way the two cannot drift.
+  #
+  # --clean, because a plain prebuild over an existing android/ merges rather
+  # than regenerates: it leaves already-written resource files alone. A palette
+  # change sat in app.json and never reached colors.xml for exactly that reason.
+  # This branch is the fresh-slate path anyway -- -Keep skips all of it.
   Step 'Re-syncing native config from app.json'
-  npx expo prebuild --platform android
+  npx expo prebuild --platform android --clean
 }
 
 Step 'Building, installing and launching'

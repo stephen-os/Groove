@@ -71,10 +71,15 @@ manager holds both comfortably.
 ### 3. Build
 
 ```powershell
-npm run prebuild
+npx expo prebuild --platform android --clean
 cd android
 .\gradlew.bat assembleRelease
 ```
+
+`--clean` rather than the plain `npm run prebuild`: prebuilding over an existing
+`android/` merges, and leaves already-written resource files as they are. A release
+that inherits stale native config is the exact failure this whole page exists to
+prevent, and `android/` is regenerated build output, so there is nothing to lose.
 
 The APK lands at:
 
