@@ -134,8 +134,10 @@ const styles = StyleSheet.create({
   picker: { gap: spacing.sm, paddingTop: spacing.xs },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   row: { flexDirection: 'row', gap: spacing.sm },
-  // Four across, so a '12 AM' label fits without the cell dropping under the
-  // 48dp minimum on a narrow phone.
-  hour: { flexBasis: '22%', flexGrow: 1 },
+  // Three across. Four was too tight: a 16dp pad each side left roughly 44dp
+  // for the label, and '12 AM' needs more than that, so it wrapped inside the
+  // pill -- worse at a larger system font size, which is exactly when it must
+  // not. Three gives about 70dp and holds up well past the default text scale.
+  hour: { flexBasis: '30%', flexGrow: 1 },
   minute: { flexGrow: 1 },
 });

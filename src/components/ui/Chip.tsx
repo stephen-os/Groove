@@ -52,7 +52,9 @@ export function Chip({
         style,
       ]}
     >
-      <Text style={selected ? styles.textOn : styles.textOff}>{label}</Text>
+      <Text numberOfLines={1} style={selected ? styles.textOn : styles.textOff}>
+        {label}
+      </Text>
     </Pressable>
   );
 }
