@@ -52,8 +52,24 @@ describe('applyReleaseSigning', () => {
   });
 
   it('declares a release signing config that reads keystore.properties', () => {
-    expect(result).toContain("storeFile file(keystoreProperties['storeFile'])");
+    expect(result).toContain("storeFile rootProject.file(keystoreProperties['storeFile'])");
     expect(result).toContain('def keystorePropertiesFile = rootProject.file("../keystore.properties")');
+  });
+
+  it('resolves the keystore from the same place it resolves the properties file', () => {
+    // The bug this replaced: a bare `file(...)` in android/app/build.gradle
+    // resolves against the app module, so `../release.keystore` meant
+    // android/release.keystore while `../keystore.properties` -- loaded two
+    // lines earlier via rootProject -- meant the repository root. One relative
+    // path in the properties file, two different bases, and the build failed
+    // with a keystore "not found" at a path nobody had written down.
+    //
+    // Asserted as a pair rather than as a literal, because what makes it
+    // correct is that the bases agree, not which base was chosen.
+    const bases = [...result.matchAll(/(\w+\.)?file\((?:keystoreProperties\['storeFile'\]|"\.\.\/keystore\.properties")\)/g)]
+      .map((match) => match[1] ?? '');
+    expect(bases).toHaveLength(2);
+    expect(new Set(bases).size).toBe(1);
   });
 
   it('keeps the keystore itself out of the generated file', () => {

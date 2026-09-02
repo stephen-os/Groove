@@ -20,10 +20,17 @@ if (keystorePropertiesFile.exists()) {
 
 // The release signing config. Guarded in Groovy so a prebuild done without a
 // keystore still produces a valid build.gradle.
+//
+// `rootProject.file`, not the bare `file`: this block lands in android/app, so
+// a plain `file('../release.keystore')` resolves against the *app module* and
+// looks for android/release.keystore. Using rootProject makes it resolve from
+// android/ instead, which is the same base the loader above uses for
+// keystore.properties -- the two paths in the generated file then mean the same
+// thing, and `../` reaches the repository root as the documentation says.
 const RELEASE_SIGNING_CONFIG = `
         release {
             if (keystorePropertiesFile.exists()) {
-                storeFile file(keystoreProperties['storeFile'])
+                storeFile rootProject.file(keystoreProperties['storeFile'])
                 storePassword keystoreProperties['storePassword']
                 keyAlias keystoreProperties['keyAlias']
                 keyPassword keystoreProperties['keyPassword']
