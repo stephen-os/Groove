@@ -1,0 +1,43 @@
+# Dependency updates, kept deliberately narrow.
+#
+# Nearly every runtime dependency here is chosen by the Expo SDK, not by this
+# project — `expo` pins compatible versions of react, react-native and the
+# expo-* modules, and `npx expo install --check` is what reconciles them. A bot
+# raising those individually produces pull requests that are green on npm and
+# broken on a device, so the npm ecosystem below is scoped to devDependencies
+# and the SDK-governed packages are ignored outright. Moving to a new SDK is a
+# deliberate act: `npx expo install --fix` after bumping `expo`, then a build.
+
+version: 2
+
+updates:
+  # Workflow actions age quietly and are not covered by any test here.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ['*']
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    # One pull request for the toolchain rather than a dozen.
+    groups:
+      dev-tooling:
+        dependency-type: development
+        patterns: ['*']
+    ignore:
+      # Owned by the Expo SDK — see the note above.
+      - dependency-name: expo
+      - dependency-name: expo-*
+      - dependency-name: '@expo/*'
+      - dependency-name: react
+      - dependency-name: react-dom
+      - dependency-name: react-native
+      - dependency-name: react-native-*
+      - dependency-name: jest-expo
+      - dependency-name: '@types/react'

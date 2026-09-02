@@ -5,9 +5,8 @@ name: verify
 # contributor runs before pushing, which is the usual way CI starts disagreeing
 # with the machine it is meant to represent.
 #
-# It does not build the Android app. That needs the SDK and about ten minutes,
-# and is tracked separately — see the note in README.md: green here means the
-# JavaScript is sound and the config is valid, not that the app runs.
+# The `android` job below covers what that script cannot: whether the app still
+# compiles at all.
 
 on:
   push:
@@ -35,3 +34,44 @@ jobs:
 
       # test -> typecheck -> lint -> deadcode -> secrets
       - run: npm run verify
+
+  # The gap `verify` cannot close: whether the Android app still compiles.
+  #
+  # A JavaScript-only gate stays green through a broken config plugin, a native
+  # module that needs a rebuild, or a manifest change Gradle rejects — every one
+  # of which only shows up when something actually assembles the app. This job
+  # is the cheapest way to find that out without a device attached.
+  #
+  # It builds *debug*: `keystore.properties` is not in the repo and never will
+  # be, so the signing plugin makes itself inert and the release variant is not
+  # buildable here. That is the intended trade — this proves the project
+  # compiles, not that a shippable artefact came out.
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          # React Native 0.86's Gradle plugin targets 17.
+          java-version: '17'
+          cache: gradle
+
+      - run: npm ci
+
+      # `--clean` because a stale android/ is the one state where prebuild
+      # appears to succeed and silently keeps the old native config. There is
+      # nothing to preserve on a fresh runner, so the flag costs nothing here
+      # and matches what the release instructions tell a human to do.
+      - run: npx expo prebuild --platform android --clean
+
+      - run: ./gradlew assembleDebug --no-daemon
+        working-directory: android
